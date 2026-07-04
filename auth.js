@@ -1,9 +1,12 @@
 // js/auth.js
 import { auth, db } from "./firebase-config.js";
 import {
+  GoogleAuthProvider,
+  signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   doc,
@@ -15,18 +18,22 @@ import {
 // ---------- Shared helpers ----------
 
 function showError(formEl, message) {
-  const errorEl = formEl.querySelector("[data-error]");
+  const errorEl = formEl?.querySelector("[data-error]");
   if (errorEl) {
     errorEl.textContent = message;
     errorEl.hidden = false;
   }
 }
 
-function setLoading(formEl, isLoading) {
-  const btn = formEl.querySelector("[data-submit]");
-  if (!btn) return;
-  btn.disabled = isLoading;
-  btn.textContent = isLoading ? "Please wait…" : btn.dataset.defaultLabel || btn.textContent;
+function setLoading(el, isLoading, label) {
+  if (!el) return;
+  el.disabled = isLoading;
+  if (isLoading) {
+    el.dataset.defaultLabel = el.dataset.defaultLabel || el.textContent;
+    el.textContent = label || "Please wait…";
+  } else {
+    el.textContent = el.dataset.defaultLabel || el.textContent;
+  }
 }
 
 function blankArtistMetadata() {
@@ -44,7 +51,21 @@ function blankArtistMetadata() {
   };
 }
 
-// ---------- Signup ----------
+function buildUserDoc(user, role) {
+  const userDoc = {
+    userId: user.uid,
+    role,
+    email: user.email,
+    displayName: user.displayName || "",
+    createdAt: serverTimestamp()
+  };
+  if (role === "ARTIST") {
+    userDoc.artistMetadata = blankArtistMetadata();
+  }
+  return userDoc;
+}
+
+// ---------- Email/Password signup ----------
 // Order matters: create the Auth account FIRST, then write the Firestore
 // user doc while the client is authenticated as that new user. Writing to
 // Firestore before auth resolves — or before the account exists — trips
@@ -53,7 +74,8 @@ function blankArtistMetadata() {
 export async function handleSignup(event) {
   event.preventDefault();
   const form = event.target;
-  setLoading(form, true);
+  const submitBtn = form.querySelector("[data-submit]");
+  setLoading(submitBtn, true);
 
   const displayName = form.displayName.value.trim();
   const email = form.email.value.trim();
@@ -62,44 +84,31 @@ export async function handleSignup(event) {
 
   if (!role) {
     showError(form, "Choose whether you're joining as a fan or an artist.");
-    setLoading(form, false);
+    setLoading(submitBtn, false);
     return;
   }
 
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    const uid = credential.user.uid;
+    const userDoc = buildUserDoc(credential.user, role);
+    userDoc.displayName = displayName; // prefer the typed name over Auth's blank displayName
 
-    const userDoc = {
-      userId: uid,
-      role,
-      email,
-      displayName,
-      createdAt: serverTimestamp()
-    };
-
-    if (role === "ARTIST") {
-      userDoc.artistMetadata = blankArtistMetadata();
-    }
-
-    // Runs after auth has resolved, with the new user already signed in —
-    // this is the ordering that avoids the permission errors seen on Stash.
-    await setDoc(doc(db, "users", uid), userDoc);
-
+    await setDoc(doc(db, "users", credential.user.uid), userDoc);
     window.location.href = role === "ARTIST" ? "artist-onboarding.html" : "dashboard.html";
   } catch (err) {
     console.error("Signup failed:", err);
     showError(form, friendlyAuthError(err));
-    setLoading(form, false);
+    setLoading(submitBtn, false);
   }
 }
 
-// ---------- Login ----------
+// ---------- Email/Password login ----------
 
 export async function handleLogin(event) {
   event.preventDefault();
   const form = event.target;
-  setLoading(form, true);
+  const submitBtn = form.querySelector("[data-submit]");
+  setLoading(submitBtn, true);
 
   const email = form.email.value.trim();
   const password = form.password.value;
@@ -110,16 +119,64 @@ export async function handleLogin(event) {
 
     if (!userSnap.exists()) {
       showError(form, "We couldn't find a profile for this account. Contact support.");
-      setLoading(form, false);
+      setLoading(submitBtn, false);
       return;
     }
 
-    const { role } = userSnap.data();
-    window.location.href = role === "ARTIST" ? "dashboard.html" : "dashboard.html";
+    window.location.href = "dashboard.html";
   } catch (err) {
     console.error("Login failed:", err);
     showError(form, friendlyAuthError(err));
-    setLoading(form, false);
+    setLoading(submitBtn, false);
+  }
+}
+
+// ---------- Google Sign-In ----------
+// Works for both first-time and returning users. After the popup resolves,
+// check whether a users/{uid} doc already exists: if yes, route by role.
+// If no, this is their very first sign-in — send them to pick Fan/Artist
+// before any user doc gets created.
+
+export async function handleGoogleSignIn(buttonEl) {
+  const provider = new GoogleAuthProvider();
+  setLoading(buttonEl, true, "Connecting…");
+
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const userSnap = await getDoc(doc(db, "users", result.user.uid));
+
+    if (userSnap.exists()) {
+      window.location.href = "dashboard.html";
+    } else {
+      window.location.href = "role-select.html";
+    }
+  } catch (err) {
+    console.error("Google sign-in failed:", err);
+    setLoading(buttonEl, false);
+    alert("Sign-in didn't go through. Please try again.");
+  }
+}
+
+// ---------- First-time role selection (Google-auth path only) ----------
+// Email/password signup already collects the role in the form itself, so
+// this page is only ever reached via a brand-new Google account.
+
+export async function completeRoleSelection(role, buttonEl) {
+  const user = auth.currentUser;
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  setLoading(buttonEl, true);
+
+  try {
+    await setDoc(doc(db, "users", user.uid), buildUserDoc(user, role));
+    window.location.href = role === "ARTIST" ? "artist-onboarding.html" : "dashboard.html";
+  } catch (err) {
+    console.error("Couldn't finish account setup:", err);
+    setLoading(buttonEl, false);
+    alert("Something went wrong finishing your setup. Please try again.");
   }
 }
 
@@ -128,11 +185,16 @@ export async function handleLogin(event) {
 export function requireAuth(onReady) {
   onAuthStateChanged(auth, (user) => {
     if (!user) {
-      window.location.href = "login.html";
+      window.location.href = "index.html";
       return;
     }
     onReady(user);
   });
+}
+
+export async function handleSignOut() {
+  await signOut(auth);
+  window.location.href = "index.html";
 }
 
 // ---------- Error copy ----------
@@ -145,5 +207,6 @@ function friendlyAuthError(err) {
   if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
     return "Email or password is incorrect.";
   }
+  if (code.includes("popup-closed-by-user")) return "Sign-in window closed before finishing.";
   return "Something went wrong. Please try again.";
 }
