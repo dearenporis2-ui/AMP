@@ -448,11 +448,31 @@ function renderPanel() {
             <p class="empty-state">Nothing published yet — your first show will appear here.</p>
           </div>
         </section>
+        <section class="dash-col" style="grid-column: 1 / -1;">
+          <p class="eyebrow">Music</p>
+          <h2>Albums &amp; tracks</h2>
+
+          <form id="album-form" class="album-form-inline">
+            <div data-error hidden></div>
+            <div class="field"><label for="albumTitle">Album title</label><input type="text" id="albumTitle" name="albumTitle" required /></div>
+            <div class="field"><label for="releaseYear">Release year</label><input type="number" id="releaseYear" name="releaseYear" min="1950" max="2100" /></div>
+            <div class="field"><label for="coverArtFile">Cover art (optional)</label><input type="file" id="coverArtFile" name="coverArtFile" accept="image/*" /></div>
+            <label class="checkbox-row"><input type="checkbox" id="isExclusive" name="isExclusive" /> Platform-exclusive (unreleased elsewhere)</label>
+            <button type="submit" class="btn btn-secondary" data-submit data-default-label="Create album">Create album</button>
+          </form>
+
+          <div id="albums-list" class="stack" style="margin-top:20px;">
+            <p class="empty-state">No albums yet — create one above, then upload tracks into it.</p>
+          </div>
+        </section>
       </main>
     </div>`;
 
   document.getElementById("signout-btn").addEventListener("click", handleSignOut);
   loadMyConcerts();
+  loadAlbums();
+
+  document.getElementById("album-form").addEventListener("submit", handleCreateAlbum);
 
   document.getElementById("concert-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -500,6 +520,204 @@ async function loadMyConcerts() {
     item.innerHTML = `<strong>${c.venueName}</strong><span class="meta">${when}</span>`;
     list.appendChild(item);
   });
+}
+
+// ---------- Albums & tracks (Ingestion Holding Pen) ----------
+
+const holdingPens = {}; // albumId -> [{ file, title }]
+
+async function loadAlbums() {
+  const snap = await getDocs(query(collection(db, "albums"), where("artistId", "==", currentUser.uid)));
+  const container = document.getElementById("albums-list");
+
+  if (snap.empty) return; // leave the default empty-state message in place
+
+  container.innerHTML = "";
+  for (const docSnap of snap.docs) {
+    const album = { id: docSnap.id, ...docSnap.data() };
+    const card = document.createElement("div");
+    card.className = "album-card";
+    card.dataset.albumId = album.id;
+    card.innerHTML = `
+      <div class="album-head">
+        <strong>${album.title}</strong>
+        <span class="meta">${album.releaseYear || ""}${album.isExclusive ? " · Exclusive" : ""}</span>
+      </div>
+      <div class="track-list" id="tracks-${album.id}"><p class="empty-state">Loading tracks…</p></div>
+      <div class="ingestion-pen">
+        <input type="file" accept="audio/*" multiple class="track-file-input" data-album-id="${album.id}" />
+        <div class="holding-pen-rows" id="pen-${album.id}"></div>
+        <button type="button" class="btn btn-secondary upload-tracks-btn" data-album-id="${album.id}" style="display:none; margin-top:10px;">Upload tracks</button>
+      </div>`;
+    container.appendChild(card);
+    loadTracksForAlbum(album.id);
+  }
+
+  container.querySelectorAll(".track-file-input").forEach((input) => {
+    input.addEventListener("change", handleFilesSelected);
+  });
+  container.querySelectorAll(".upload-tracks-btn").forEach((btn) => {
+    btn.addEventListener("click", handleUploadTracks);
+  });
+}
+
+async function loadTracksForAlbum(albumId) {
+  const snap = await getDocs(query(collection(db, "tracks"), where("albumId", "==", albumId)));
+  const list = document.getElementById(`tracks-${albumId}`);
+  if (!list) return;
+
+  if (snap.empty) {
+    list.innerHTML = `<p class="empty-state">No tracks yet — add some below.</p>`;
+    return;
+  }
+  list.innerHTML = "";
+  snap.forEach((docSnap) => {
+    const t = docSnap.data();
+    const row = document.createElement("div");
+    row.className = "list-item";
+    row.innerHTML = `<strong>${t.title}</strong><span class="meta">${t.duration || ""}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function handleFilesSelected(e) {
+  const albumId = e.target.dataset.albumId;
+  const files = Array.from(e.target.files);
+  holdingPens[albumId] = files.map((file) => ({
+    file,
+    title: file.name.replace(/\.[^/.]+$/, "")
+  }));
+  renderHoldingPen(albumId);
+}
+
+function renderHoldingPen(albumId) {
+  const items = holdingPens[albumId] || [];
+  const pen = document.getElementById(`pen-${albumId}`);
+  const uploadBtn = document.querySelector(`.upload-tracks-btn[data-album-id="${albumId}"]`);
+
+  pen.innerHTML = items
+    .map(
+      (item, idx) => `
+      <div class="pen-row">
+        <input type="text" class="pen-title-input" data-album-id="${albumId}" data-idx="${idx}" value="${item.title}" />
+        <span class="meta">${item.file.name}</span>
+      </div>`
+    )
+    .join("");
+
+  pen.querySelectorAll(".pen-title-input").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(e.target.dataset.idx);
+      holdingPens[albumId][idx].title = e.target.value;
+    });
+  });
+
+  uploadBtn.style.display = items.length ? "block" : "none";
+}
+
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(audio.src);
+      resolve(audio.duration);
+    };
+    audio.onerror = () => resolve(0);
+    audio.src = URL.createObjectURL(file);
+  });
+}
+
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+async function handleUploadTracks(e) {
+  const albumId = e.currentTarget.dataset.albumId;
+  const items = holdingPens[albumId] || [];
+  if (!items.length) return;
+
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.textContent = `Uploading 0/${items.length}…`;
+  let done = 0;
+
+  try {
+    // Throttled 3-channel upload stream — matches the Ingestion Holding
+    // Pen spec, so a full album drop doesn't fire a dozen uploads at once.
+    await mapWithConcurrency(items, 3, async (item) => {
+      const [audioUrl, durationSeconds] = await Promise.all([
+        uploadToCloudinary(item.file),
+        getAudioDuration(item.file)
+      ]);
+      await addDoc(collection(db, "tracks"), {
+        albumId,
+        artistId: currentUser.uid,
+        title: item.title,
+        audioUrl,
+        duration: formatDuration(durationSeconds),
+        playCount: 0
+      });
+      done++;
+      btn.textContent = `Uploading ${done}/${items.length}…`;
+    });
+
+    delete holdingPens[albumId];
+    document.querySelector(`.track-file-input[data-album-id="${albumId}"]`).value = "";
+    document.getElementById(`pen-${albumId}`).innerHTML = "";
+    btn.style.display = "none";
+    loadTracksForAlbum(albumId);
+  } catch (err) {
+    console.error("Track upload failed:", err);
+    alert("Some tracks didn't upload. Please try again.");
+    btn.disabled = false;
+    btn.textContent = "Upload tracks";
+  }
+}
+
+async function handleCreateAlbum(e) {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = form.querySelector("[data-submit]");
+  submitBtn.disabled = true;
+
+  try {
+    let coverArt = null;
+    const file = form.coverArtFile.files[0];
+    if (file) coverArt = await uploadToCloudinary(file);
+
+    await addDoc(collection(db, "albums"), {
+      artistId: currentUser.uid,
+      title: form.albumTitle.value.trim(),
+      releaseYear: form.releaseYear.value ? Number(form.releaseYear.value) : null,
+      coverArt,
+      isExclusive: form.isExclusive.checked
+    });
+
+    form.reset();
+    loadAlbums();
+  } catch (err) {
+    console.error("Couldn't create album:", err);
+    showError(form, "Something went wrong creating that album. Please try again.");
+  } finally {
+    submitBtn.disabled = false;
+  }
 }
 
 // ==========================================================================
