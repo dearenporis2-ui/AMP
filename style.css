@@ -294,8 +294,130 @@ h2 {
 }
 
 /* ==========================================================================
-   Landing choice screen
+   App shell (dashboard / panel pages)
    ========================================================================== */
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-mark.small {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  background: var(--gradient-action);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-chip {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 28px;
+}
+
+.panel-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 28px;
+}
+
+@media (max-width: 900px) {
+  .dash-grid,
+  .panel-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.badge-pro {
+  background: var(--gradient-action);
+  color: #0b111e;
+  border: none;
+  font-weight: 600;
+}
+
+.dash-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+}
+
+.dash-col h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.list-item {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.list-item .meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
 
 .choice-stack {
   display: flex;
