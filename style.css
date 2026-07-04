@@ -412,6 +412,27 @@ h2 {
   font-size: 13px;
 }
 
+.track-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-play {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gradient-action);
+  color: #0b111e;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .empty-state {
   color: var(--text-muted);
   font-size: 14px;
