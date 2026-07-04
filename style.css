@@ -433,6 +433,104 @@ h2 {
   justify-content: center;
 }
 
+/* ==========================================================================
+   Persistent player bar
+   ========================================================================== */
+
+.player-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.player-track-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.player-track-info strong {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 140px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 34px;
+}
+
+.player-range {
+  flex: 1;
+  accent-color: var(--hibiscus);
+}
+
+/* ==========================================================================
+   Equalizer panel
+   ========================================================================== */
+
+.eq-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 72px;
+  z-index: 41;
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+}
+
+.eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.eq-band input[type="range"] {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 20px;
+  height: 90px;
+  accent-color: var(--sunset);
+}
+
+/* Reserve space at the bottom of scrollable layouts so the fixed player
+   bar never overlaps the last row of content. */
+.app-shell {
+  padding-bottom: 76px;
+}
+
 .empty-state {
   color: var(--text-muted);
   font-size: 14px;
