@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create your AMP account</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="screen">
+    <div class="card">
+      <p class="eyebrow">Join AMP</p>
+      <h1>Create your account</h1>
+      <p class="tagline" style="text-align:left; margin-bottom:20px;">Fans stream and follow for free. Artists publish music and shows.</p>
+
+      <form id="signup-form" novalidate>
+        <div class="role-picker">
+          <input type="radio" id="role-fan" name="role" value="FAN" checked />
+          <label for="role-fan">I'm a fan</label>
+
+          <input type="radio" id="role-artist" name="role" value="ARTIST" />
+          <label for="role-artist">I'm an artist</label>
+        </div>
+
+        <div data-error hidden></div>
+
+        <div class="field">
+          <label for="displayName">Name</label>
+          <input type="text" id="displayName" name="displayName" required autocomplete="name" />
+        </div>
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required minlength="6" autocomplete="new-password" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" data-submit data-default-label="Create account">Create account</button>
+      </form>
+
+      <p class="form-footer">Already have an account? <a href="login.html">Log in</a></p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { handleSignup } from "./js/auth.js";
+    document.getElementById("signup-form").addEventListener("submit", handleSignup);
+  </script>
+</body>
+</html>

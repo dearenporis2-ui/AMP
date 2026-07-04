@@ -1,0 +1,274 @@
+/* ==========================================================================
+   AMP — Design Tokens
+   Primary canvas: Midnight Ocean Navy. No true black, no flat industrial grey.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap");
+
+:root {
+  /* Canvas */
+  --bg: #0b111e;
+  --surface: #131b2e;
+  --surface-raised: #1b2540;
+  --border: rgba(255, 255, 255, 0.08);
+
+  /* Type */
+  --text-primary: #f5f3ee;
+  --text-muted: #8a93a8;
+
+  /* Action tones — reserved for playback state, waveforms, primary conversion */
+  --hibiscus: #ff4d8d;
+  --sunset: #ff7a45;
+  --gradient-action: linear-gradient(135deg, var(--sunset), var(--hibiscus));
+
+  /* Type scale */
+  --font-display: "Fraunces", serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius-md: 14px;
+  --radius-lg: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+/* ==========================================================================
+   Layout shell
+   ========================================================================== */
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Signature element: a soft sunset/hibiscus glow arc behind the hero,
+   evoking a waveform pulse without needing artist photography to exist yet. */
+.screen::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  width: 620px;
+  height: 620px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(255, 122, 69, 0.28) 0%, rgba(255, 77, 141, 0.14) 45%, transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px 28px;
+}
+
+/* ==========================================================================
+   Brand & type
+   ========================================================================== */
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  text-align: center;
+  margin: 0 0 6px;
+}
+
+.brand-mark {
+  background: var(--gradient-action);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tagline {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sunset);
+  margin: 0 0 8px;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.field input:focus {
+  outline: 2px solid var(--hibiscus);
+  outline-offset: 1px;
+}
+
+/* Role picker — segmented control for Fan / Artist at signup */
+.role-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.role-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.role-picker label {
+  display: block;
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.role-picker input:checked + label {
+  border-color: var(--hibiscus);
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--gradient-action);
+  color: #0b111e;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  margin-top: 10px;
+}
+
+.form-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 20px;
+}
+
+.form-footer a {
+  color: var(--hibiscus);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Error state
+   ========================================================================== */
+
+[data-error] {
+  background: rgba(255, 77, 141, 0.12);
+  border: 1px solid rgba(255, 77, 141, 0.3);
+  color: #ffb4cf;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ==========================================================================
+   Landing choice screen
+   ========================================================================== */
+
+.choice-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
