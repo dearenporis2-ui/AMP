@@ -419,6 +419,92 @@ h2 {
   margin: 0;
 }
 
+/* ==========================================================================
+   Albums, tracks, ingestion holding pen
+   ========================================================================== */
+
+.album-form-inline {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.album-form-inline [data-error] {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .album-form-inline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.album-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.album-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ingestion-pen input[type="file"] {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.holding-pen-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pen-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pen-row .pen-title-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.pen-row .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .choice-stack {
   display: flex;
   flex-direction: column;
