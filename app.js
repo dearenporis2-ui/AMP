@@ -31,6 +31,11 @@ import {
 const CLOUD_NAME = "dflbqacnt";
 const UPLOAD_PRESET = "amp_media";
 
+const PLAY_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5-10-5.5z"/></svg>`;
+const PAUSE_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>`;
+const VOLUME_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2V6z" fill="currentColor" stroke="none"/><path d="M10.5 5.5a4 4 0 0 1 0 5"/><path d="M12.3 3.7a6.8 6.8 0 0 1 0 8.6"/></svg>`;
+const EQ_ICON = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="13" x2="3" y2="7"/><circle cx="3" cy="5" r="1.5" fill="currentColor" stroke="none"/><line x1="8" y1="13" x2="8" y2="3"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><line x1="13" y1="13" x2="13" y2="9"/><circle cx="13" cy="6" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+
 const view = document.getElementById("view");
 
 let currentUser = null;
@@ -574,7 +579,7 @@ function initAudioGraph() {
 }
 
 function setBtnPlaying(btn, isPlaying) {
-  if (btn) btn.textContent = isPlaying ? "⏸" : "▶";
+  if (btn) btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON;
 }
 
 function playTrack(track, artistLabel, btn) {
@@ -600,8 +605,16 @@ function playTrack(track, artistLabel, btn) {
   document.getElementById("player-bar").hidden = false;
   document.getElementById("player-track-title").textContent = track.title;
   document.getElementById("player-track-artist").textContent = artistLabel || "";
+  styleRangeFill(document.getElementById("player-seek"), 0);
 
   incrementPlayCount(track.id);
+}
+
+function styleRangeFill(el, pct, vertical = false) {
+  if (!el) return;
+  const dir = vertical ? "to top" : "to right";
+  const color = vertical ? "var(--sunset)" : "var(--hibiscus)";
+  el.style.background = `linear-gradient(${dir}, ${color} ${pct}%, var(--surface-raised) ${pct}%)`;
 }
 
 player.addEventListener("play", () => setBtnPlaying(currentPlayBtn, true));
@@ -610,7 +623,9 @@ player.addEventListener("ended", () => setBtnPlaying(currentPlayBtn, false));
 
 player.addEventListener("timeupdate", () => {
   if (isSeeking || !player.duration) return;
-  document.getElementById("player-seek").value = (player.currentTime / player.duration) * 100;
+  const pct = (player.currentTime / player.duration) * 100;
+  document.getElementById("player-seek").value = pct;
+  styleRangeFill(document.getElementById("player-seek"), pct);
   document.getElementById("player-current-time").textContent = formatDuration(player.currentTime);
 });
 
@@ -628,6 +643,19 @@ function initPlayerBarControls() {
   const bassEl = document.getElementById("eq-bass");
   const midEl = document.getElementById("eq-mid");
   const trebleEl = document.getElementById("eq-treble");
+  const bassValue = document.getElementById("eq-bass-value");
+  const midValue = document.getElementById("eq-mid-value");
+  const trebleValue = document.getElementById("eq-treble-value");
+
+  // Seed icons — HTML ships with empty containers so app.js owns all iconography.
+  setBtnPlaying(playPauseBtn, false);
+  document.querySelector(".icon-volume").innerHTML = VOLUME_ICON;
+  document.querySelector(".icon-eq").innerHTML = EQ_ICON;
+  styleRangeFill(seekEl, 0);
+  styleRangeFill(volumeEl, 100);
+  styleRangeFill(bassEl, 50, true);
+  styleRangeFill(midEl, 50, true);
+  styleRangeFill(trebleEl, 50, true);
 
   playPauseBtn.addEventListener("click", () => {
     if (!currentTrackId) return;
@@ -638,7 +666,10 @@ function initPlayerBarControls() {
   player.addEventListener("pause", () => setBtnPlaying(playPauseBtn, false));
   player.addEventListener("ended", () => setBtnPlaying(playPauseBtn, false));
 
-  seekEl.addEventListener("input", () => { isSeeking = true; });
+  seekEl.addEventListener("input", () => {
+    isSeeking = true;
+    styleRangeFill(seekEl, seekEl.value);
+  });
   seekEl.addEventListener("change", () => {
     if (player.duration) player.currentTime = (seekEl.value / 100) * player.duration;
     isSeeking = false;
@@ -646,18 +677,46 @@ function initPlayerBarControls() {
 
   volumeEl.addEventListener("input", () => {
     player.volume = volumeEl.value / 100;
+    styleRangeFill(volumeEl, volumeEl.value);
   });
 
   eqToggle.addEventListener("click", () => {
     eqPanel.hidden = !eqPanel.hidden;
   });
 
-  bassEl.addEventListener("input", () => { initAudioGraph(); bassFilter.gain.value = Number(bassEl.value); });
-  midEl.addEventListener("input", () => { initAudioGraph(); midFilter.gain.value = Number(midEl.value); });
-  trebleEl.addEventListener("input", () => { initAudioGraph(); trebleFilter.gain.value = Number(trebleEl.value); });
+  // EQ sliders run -15..15 but the vertical fill is drawn on a 0..100 scale,
+  // so map the raw value to a fill percentage: 0dB sits at the midpoint.
+  function eqFillPct(value) {
+    return ((Number(value) + 15) / 30) * 100;
+  }
+
+  bassEl.addEventListener("input", () => {
+    initAudioGraph();
+    bassFilter.gain.value = Number(bassEl.value);
+    bassValue.textContent = `${bassEl.value > 0 ? "+" : ""}${bassEl.value}dB`;
+    styleRangeFill(bassEl, eqFillPct(bassEl.value), true);
+  });
+  midEl.addEventListener("input", () => {
+    initAudioGraph();
+    midFilter.gain.value = Number(midEl.value);
+    midValue.textContent = `${midEl.value > 0 ? "+" : ""}${midEl.value}dB`;
+    styleRangeFill(midEl, eqFillPct(midEl.value), true);
+  });
+  trebleEl.addEventListener("input", () => {
+    initAudioGraph();
+    trebleFilter.gain.value = Number(trebleEl.value);
+    trebleValue.textContent = `${trebleEl.value > 0 ? "+" : ""}${trebleEl.value}dB`;
+    styleRangeFill(trebleEl, eqFillPct(trebleEl.value), true);
+  });
 
   eqReset.addEventListener("click", () => {
-    bassEl.value = 0; midEl.value = 0; trebleEl.value = 0;
+    [bassEl, midEl, trebleEl].forEach((el) => {
+      el.value = 0;
+      styleRangeFill(el, 50, true);
+    });
+    bassValue.textContent = "0dB";
+    midValue.textContent = "0dB";
+    trebleValue.textContent = "0dB";
     if (bassFilter) bassFilter.gain.value = 0;
     if (midFilter) midFilter.gain.value = 0;
     if (trebleFilter) trebleFilter.gain.value = 0;
@@ -688,7 +747,7 @@ function trackRowHtml(track, artistLabel) {
         <strong>${track.title}</strong>
         <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
       </div>
-      <button type="button" class="btn-play" data-track-id="${track.id}">▶</button>
+      <button type="button" class="btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
     </div>`;
 }
 
