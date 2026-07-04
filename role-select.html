@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>One more thing — AMP</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="screen">
+    <div class="card">
+      <p class="eyebrow">Almost there</p>
+      <h1>How will you use AMP?</h1>
+      <p class="tagline" style="text-align:left; margin-bottom:20px;">This can't be changed later without contacting support, so pick the one that fits.</p>
+
+      <div class="choice-stack">
+        <button type="button" class="btn btn-primary" id="fan-btn" data-default-label="I'm a fan">I'm a fan</button>
+        <button type="button" class="btn btn-secondary" id="artist-btn" data-default-label="I'm an artist">I'm an artist</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { completeRoleSelection, requireAuth } from "./auth.js";
+
+    // Guard: only a signed-in user (mid Google sign-in flow, doc not yet
+    // created) should land here. Anyone else gets bounced to the landing page.
+    requireAuth(() => {
+      document.getElementById("fan-btn").addEventListener("click", (e) => completeRoleSelection("FAN", e.currentTarget));
+      document.getElementById("artist-btn").addEventListener("click", (e) => completeRoleSelection("ARTIST", e.currentTarget));
+    });
+  </script>
+</body>
+</html>
