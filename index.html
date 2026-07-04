@@ -11,37 +11,48 @@
 
   <div id="player-bar" class="player-bar" hidden>
     <div class="player-track-info">
-      <strong id="player-track-title">—</strong>
-      <span id="player-track-artist" class="meta"></span>
+      <div class="player-art"></div>
+      <div class="player-track-text">
+        <strong id="player-track-title">—</strong>
+        <span id="player-track-artist" class="meta"></span>
+      </div>
     </div>
 
     <div class="player-controls">
-      <button type="button" id="player-playpause" class="btn-play">▶</button>
-      <span id="player-current-time" class="meta mono">0:00</span>
+      <button type="button" id="player-playpause" class="btn-transport"></button>
+      <span id="player-current-time" class="mono">0:00</span>
       <input type="range" id="player-seek" class="player-range" min="0" max="100" value="0" />
-      <span id="player-duration" class="meta mono">0:00</span>
+      <span id="player-duration" class="mono">0:00</span>
     </div>
 
     <div class="player-volume">
-      <span class="meta">Vol</span>
+      <span class="icon-volume"></span>
       <input type="range" id="player-volume" class="player-range" min="0" max="100" value="100" />
     </div>
 
-    <button type="button" id="player-eq-toggle" class="btn-ghost">EQ</button>
+    <button type="button" id="player-eq-toggle" class="btn-eq-toggle">
+      <span class="icon-eq"></span> EQ
+    </button>
   </div>
 
   <div id="eq-panel" class="eq-panel" hidden>
-    <div class="eq-band">
-      <label for="eq-bass">Bass</label>
-      <input type="range" id="eq-bass" class="eq-range" min="-15" max="15" value="0" />
-    </div>
-    <div class="eq-band">
-      <label for="eq-mid">Mid</label>
-      <input type="range" id="eq-mid" class="eq-range" min="-15" max="15" value="0" />
-    </div>
-    <div class="eq-band">
-      <label for="eq-treble">Treble</label>
-      <input type="range" id="eq-treble" class="eq-range" min="-15" max="15" value="0" />
+    <p class="eq-title">Equalizer</p>
+    <div class="eq-bands">
+      <div class="eq-band">
+        <span class="eq-value" id="eq-bass-value">0dB</span>
+        <input type="range" id="eq-bass" class="eq-range" min="-15" max="15" value="0" />
+        <label for="eq-bass">Bass</label>
+      </div>
+      <div class="eq-band">
+        <span class="eq-value" id="eq-mid-value">0dB</span>
+        <input type="range" id="eq-mid" class="eq-range" min="-15" max="15" value="0" />
+        <label for="eq-mid">Mid</label>
+      </div>
+      <div class="eq-band">
+        <span class="eq-value" id="eq-treble-value">0dB</span>
+        <input type="range" id="eq-treble" class="eq-range" min="-15" max="15" value="0" />
+        <label for="eq-treble">Treble</label>
+      </div>
     </div>
     <button type="button" id="eq-reset" class="btn-ghost">Reset</button>
   </div>
