@@ -327,6 +327,13 @@ function renderDashboard() {
             <p class="empty-state">Tap the heart on any track to start your favorites.</p>
           </div>
         </section>
+        <section class="dash-col" style="grid-column: 1 / -1;">
+          <p class="eyebrow">Discover</p>
+          <h2>Tracks on AMP</h2>
+          <div id="browse-tracks-list" class="stack">
+            <p class="empty-state">No tracks published yet.</p>
+          </div>
+        </section>
       </main>
     </div>`;
 
@@ -360,6 +367,8 @@ async function loadDashboardData() {
     document.getElementById("playlist-list").innerHTML =
       `<p class="empty-state">${trackCount} track${trackCount === 1 ? "" : "s"} saved.</p>`;
   }
+
+  await loadBrowseTracks("browse-tracks-list");
 }
 
 function renderOnboarding() {
@@ -522,7 +531,96 @@ async function loadMyConcerts() {
   });
 }
 
-// ---------- Albums & tracks (Ingestion Holding Pen) ----------
+// ---------- Shared playback ----------
+// One audio element for the whole app — switching tracks pauses whichever
+// was playing, so two tracks never overlap regardless of which view they're in.
+
+let currentAudio = null;
+let currentPlayBtn = null;
+
+function toggleTrackPlayback(btn) {
+  const url = btn.dataset.audioUrl;
+
+  if (currentPlayBtn === btn) {
+    if (currentAudio.paused) {
+      currentAudio.play();
+      btn.textContent = "⏸";
+    } else {
+      currentAudio.pause();
+      btn.textContent = "▶";
+    }
+    return;
+  }
+
+  if (currentAudio) {
+    currentAudio.pause();
+    if (currentPlayBtn) currentPlayBtn.textContent = "▶";
+  }
+
+  currentAudio = new Audio(url);
+  currentPlayBtn = btn;
+  currentAudio.play();
+  btn.textContent = "⏸";
+
+  currentAudio.addEventListener("ended", () => {
+    btn.textContent = "▶";
+  });
+
+  incrementPlayCount(btn.dataset.trackId);
+}
+
+async function incrementPlayCount(trackId) {
+  if (!trackId) return;
+  try {
+    const ref = doc(db, "tracks", trackId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { playCount: (snap.data().playCount || 0) + 1 });
+    }
+  } catch (err) {
+    console.error("Couldn't update play count:", err);
+    // Non-critical — playback already succeeded, so this fails silently.
+  }
+}
+
+function trackRowHtml(track, artistLabel) {
+  return `
+    <div class="list-item track-row">
+      <div>
+        <strong>${track.title}</strong>
+        <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
+      </div>
+      <button type="button" class="btn-play" data-audio-url="${track.audioUrl}" data-track-id="${track.id}">▶</button>
+    </div>`;
+}
+
+function wirePlayButtons(container) {
+  container.querySelectorAll(".btn-play").forEach((btn) => {
+    btn.addEventListener("click", () => toggleTrackPlayback(btn));
+  });
+}
+
+async function loadBrowseTracks(containerId) {
+  const snap = await getDocs(query(collection(db, "tracks")));
+  if (snap.empty) return; // leave the default empty-state message in place
+
+  const tracks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const artistIds = [...new Set(tracks.map((t) => t.artistId))];
+  const artistNames = {};
+
+  await Promise.all(
+    artistIds.map(async (aid) => {
+      const aSnap = await getDoc(doc(db, "users", aid));
+      artistNames[aid] = aSnap.exists() ? aSnap.data().displayName || "Unknown artist" : "Unknown artist";
+    })
+  );
+
+  const list = document.getElementById(containerId);
+  list.innerHTML = tracks.map((t) => trackRowHtml(t, artistNames[t.artistId])).join("");
+  wirePlayButtons(list);
+}
+
+
 
 const holdingPens = {}; // albumId -> [{ file, title }]
 
@@ -570,14 +668,9 @@ async function loadTracksForAlbum(albumId) {
     list.innerHTML = `<p class="empty-state">No tracks yet — add some below.</p>`;
     return;
   }
-  list.innerHTML = "";
-  snap.forEach((docSnap) => {
-    const t = docSnap.data();
-    const row = document.createElement("div");
-    row.className = "list-item";
-    row.innerHTML = `<strong>${t.title}</strong><span class="meta">${t.duration || ""}</span>`;
-    list.appendChild(row);
-  });
+  const tracks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  list.innerHTML = tracks.map((t) => trackRowHtml(t)).join("");
+  wirePlayButtons(list);
 }
 
 function handleFilesSelected(e) {
