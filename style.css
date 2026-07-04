@@ -451,6 +451,11 @@ h2 {
   border-top: 1px solid var(--border);
 }
 
+.player-bar[hidden],
+.eq-panel[hidden] {
+  display: none;
+}
+
 .player-track-info {
   display: flex;
   flex-direction: column;
