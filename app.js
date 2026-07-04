@@ -531,43 +531,140 @@ async function loadMyConcerts() {
   });
 }
 
-// ---------- Shared playback ----------
-// One audio element for the whole app — switching tracks pauses whichever
-// was playing, so two tracks never overlap regardless of which view they're in.
+// ---------- Shared playback engine ----------
+// One persistent <audio> element for the whole app (not a new Audio() per
+// track) — this is required for the equalizer: createMediaElementSource
+// can only be called once per element, so every track has to reuse the
+// same element via .src, not spin up a fresh one.
 
-let currentAudio = null;
+const player = new Audio();
+player.crossOrigin = "anonymous"; // needed for Web Audio to read Cloudinary's cross-origin stream
+
+let audioCtx = null;
+let bassFilter, midFilter, trebleFilter;
+let currentTrackId = null;
 let currentPlayBtn = null;
+let currentTrackMeta = null;
+let isSeeking = false;
 
-function toggleTrackPlayback(btn) {
-  const url = btn.dataset.audioUrl;
+const trackCache = {}; // trackId -> track data, populated as rows render
 
-  if (currentPlayBtn === btn) {
-    if (currentAudio.paused) {
-      currentAudio.play();
-      btn.textContent = "⏸";
-    } else {
-      currentAudio.pause();
-      btn.textContent = "▶";
-    }
+function initAudioGraph() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioCtx.createMediaElementSource(player);
+
+  bassFilter = audioCtx.createBiquadFilter();
+  bassFilter.type = "lowshelf";
+  bassFilter.frequency.value = 200;
+
+  midFilter = audioCtx.createBiquadFilter();
+  midFilter.type = "peaking";
+  midFilter.frequency.value = 1000;
+  midFilter.Q.value = 0.7;
+
+  trebleFilter = audioCtx.createBiquadFilter();
+  trebleFilter.type = "highshelf";
+  trebleFilter.frequency.value = 4000;
+
+  source.connect(bassFilter);
+  bassFilter.connect(midFilter);
+  midFilter.connect(trebleFilter);
+  trebleFilter.connect(audioCtx.destination);
+}
+
+function setBtnPlaying(btn, isPlaying) {
+  if (btn) btn.textContent = isPlaying ? "⏸" : "▶";
+}
+
+function playTrack(track, artistLabel, btn) {
+  initAudioGraph();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+
+  if (currentTrackId === track.id) {
+    if (player.paused) player.play();
+    else player.pause();
     return;
   }
 
-  if (currentAudio) {
-    currentAudio.pause();
-    if (currentPlayBtn) currentPlayBtn.textContent = "▶";
-  }
+  if (currentPlayBtn) setBtnPlaying(currentPlayBtn, false);
 
-  currentAudio = new Audio(url);
+  currentTrackId = track.id;
   currentPlayBtn = btn;
-  currentAudio.play();
-  btn.textContent = "⏸";
+  currentTrackMeta = { title: track.title, artistLabel };
 
-  currentAudio.addEventListener("ended", () => {
-    btn.textContent = "▶";
+  player.src = track.audioUrl;
+  player.currentTime = 0;
+  player.play();
+
+  document.getElementById("player-bar").hidden = false;
+  document.getElementById("player-track-title").textContent = track.title;
+  document.getElementById("player-track-artist").textContent = artistLabel || "";
+
+  incrementPlayCount(track.id);
+}
+
+player.addEventListener("play", () => setBtnPlaying(currentPlayBtn, true));
+player.addEventListener("pause", () => setBtnPlaying(currentPlayBtn, false));
+player.addEventListener("ended", () => setBtnPlaying(currentPlayBtn, false));
+
+player.addEventListener("timeupdate", () => {
+  if (isSeeking || !player.duration) return;
+  document.getElementById("player-seek").value = (player.currentTime / player.duration) * 100;
+  document.getElementById("player-current-time").textContent = formatDuration(player.currentTime);
+});
+
+player.addEventListener("loadedmetadata", () => {
+  document.getElementById("player-duration").textContent = formatDuration(player.duration);
+});
+
+function initPlayerBarControls() {
+  const playPauseBtn = document.getElementById("player-playpause");
+  const seekEl = document.getElementById("player-seek");
+  const volumeEl = document.getElementById("player-volume");
+  const eqToggle = document.getElementById("player-eq-toggle");
+  const eqPanel = document.getElementById("eq-panel");
+  const eqReset = document.getElementById("eq-reset");
+  const bassEl = document.getElementById("eq-bass");
+  const midEl = document.getElementById("eq-mid");
+  const trebleEl = document.getElementById("eq-treble");
+
+  playPauseBtn.addEventListener("click", () => {
+    if (!currentTrackId) return;
+    if (player.paused) player.play();
+    else player.pause();
+  });
+  player.addEventListener("play", () => setBtnPlaying(playPauseBtn, true));
+  player.addEventListener("pause", () => setBtnPlaying(playPauseBtn, false));
+  player.addEventListener("ended", () => setBtnPlaying(playPauseBtn, false));
+
+  seekEl.addEventListener("input", () => { isSeeking = true; });
+  seekEl.addEventListener("change", () => {
+    if (player.duration) player.currentTime = (seekEl.value / 100) * player.duration;
+    isSeeking = false;
   });
 
-  incrementPlayCount(btn.dataset.trackId);
+  volumeEl.addEventListener("input", () => {
+    player.volume = volumeEl.value / 100;
+  });
+
+  eqToggle.addEventListener("click", () => {
+    eqPanel.hidden = !eqPanel.hidden;
+  });
+
+  bassEl.addEventListener("input", () => { initAudioGraph(); bassFilter.gain.value = Number(bassEl.value); });
+  midEl.addEventListener("input", () => { initAudioGraph(); midFilter.gain.value = Number(midEl.value); });
+  trebleEl.addEventListener("input", () => { initAudioGraph(); trebleFilter.gain.value = Number(trebleEl.value); });
+
+  eqReset.addEventListener("click", () => {
+    bassEl.value = 0; midEl.value = 0; trebleEl.value = 0;
+    if (bassFilter) bassFilter.gain.value = 0;
+    if (midFilter) midFilter.gain.value = 0;
+    if (trebleFilter) trebleFilter.gain.value = 0;
+  });
 }
+
+initPlayerBarControls();
 
 async function incrementPlayCount(trackId) {
   if (!trackId) return;
@@ -584,19 +681,23 @@ async function incrementPlayCount(trackId) {
 }
 
 function trackRowHtml(track, artistLabel) {
+  trackCache[track.id] = { ...track, artistLabel };
   return `
     <div class="list-item track-row">
       <div>
         <strong>${track.title}</strong>
         <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
       </div>
-      <button type="button" class="btn-play" data-audio-url="${track.audioUrl}" data-track-id="${track.id}">▶</button>
+      <button type="button" class="btn-play" data-track-id="${track.id}">▶</button>
     </div>`;
 }
 
 function wirePlayButtons(container) {
   container.querySelectorAll(".btn-play").forEach((btn) => {
-    btn.addEventListener("click", () => toggleTrackPlayback(btn));
+    btn.addEventListener("click", () => {
+      const track = trackCache[btn.dataset.trackId];
+      if (track) playTrack(track, track.artistLabel, btn);
+    });
   });
 }
 
