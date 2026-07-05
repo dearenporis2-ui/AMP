@@ -774,6 +774,8 @@ h2 {
   flex: 1;
   max-height: 340px;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .eq-gridline {
@@ -797,6 +799,8 @@ h2 {
   stroke: var(--hibiscus);
   stroke-width: 2;
   cursor: grab;
+  -webkit-user-drag: none;
+  touch-action: none;
 }
 
 .eq-node:active {
