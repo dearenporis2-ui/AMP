@@ -54,3 +54,31 @@ fits a drag-and-drop deploy workflow with no build step.
 Navigating to a protected route while signed out bounces back to `#/`
 automatically. Landing on `#/` while already signed in skips straight to
 the right dashboard/panel instead of showing the choice screen again.
+
+## Activating an artist
+
+New artists are invisible to fans by default — they can sign up, log in, and
+manage their own catalog privately, but nothing they publish (tracks or
+concerts) shows up anywhere public until you activate them. This is the
+`isActive` flag from the original blueprint, now actually enforced on the
+fan-facing views (it wasn't being filtered on before this pass — a real gap,
+not just an oversight left in on purpose).
+
+**To activate an artist right now** (no in-app admin panel exists yet):
+1. Firebase Console → **Firestore Database** → `users` collection
+2. Find their document (search by `email` or `displayName` field)
+3. Open `artistMetadata` → set `isActive` to `true`
+4. Optionally also set `isVerified` to `true` — this is a separate, purely
+   editorial "this is a real trusted local artist" badge. `isActive` alone
+   shows a "Live on AMP" badge on their panel; both together shows "Pro".
+
+The artist sees their own status update automatically — the small dot next
+to their status badge in the panel header pulses while `isActive` is false
+("Awaiting approval") and turns solid the moment you flip it, no refresh
+needed beyond their next page load.
+
+**Worth knowing:** doing this by hand in the Firestore console works fine at
+your current scale, but doesn't scale past a handful of artists — a real
+in-app Admin panel (restricted to your `isAdmin` account) that lists pending
+signups with one-click activate is a natural next build once you're
+onboarding artists regularly instead of one at a time.
