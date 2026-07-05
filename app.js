@@ -741,6 +741,21 @@ function renderAdvancedGraph() {
   });
 }
 
+function updateGraphLive() {
+  const svg = document.getElementById("eq-advanced-graph");
+  const gains = currentGains();
+  const points = gains.map((g, i) => ({ x: eqFreqX(i), y: eqGainY(g) }));
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+
+  const path = svg.querySelector(".eq-curve-path");
+  if (path) path.setAttribute("d", pathD);
+
+  points.forEach((p, i) => {
+    const node = svg.querySelector(`.eq-node[data-index="${i}"]`);
+    if (node) node.setAttribute("cy", p.y);
+  });
+}
+
 function startEqDrag(e) {
   const node = e.currentTarget;
   const index = Number(node.dataset.index);
@@ -751,7 +766,7 @@ function startEqDrag(e) {
     const rect = svg.getBoundingClientRect();
     const y = ((ev.clientY - rect.top) / rect.height) * EQ_GRAPH_H;
     setBandGain(index, eqYToGain(y));
-    renderAdvancedGraph();
+    updateGraphLive(); // only moves the existing dot/path — never recreates them mid-drag
     syncQuickPanelFromFilters();
   }
   function onUp() {
