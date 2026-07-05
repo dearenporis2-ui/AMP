@@ -757,24 +757,33 @@ function updateGraphLive() {
 }
 
 function startEqDrag(e) {
+  e.preventDefault();
   const node = e.currentTarget;
   const index = Number(node.dataset.index);
-  node.setPointerCapture(e.pointerId);
 
   function onMove(ev) {
+    ev.preventDefault();
     const svg = document.getElementById("eq-advanced-graph");
     const rect = svg.getBoundingClientRect();
-    const y = ((ev.clientY - rect.top) / rect.height) * EQ_GRAPH_H;
+    const clientY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+    const y = ((clientY - rect.top) / rect.height) * EQ_GRAPH_H;
     setBandGain(index, eqYToGain(y));
     updateGraphLive(); // only moves the existing dot/path — never recreates them mid-drag
     syncQuickPanelFromFilters();
   }
   function onUp() {
-    node.removeEventListener("pointermove", onMove);
-    node.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
   }
-  node.addEventListener("pointermove", onMove);
-  node.addEventListener("pointerup", onUp);
+
+  // Window-level, not node-level: an SVG shape can trigger a native
+  // "drag image" gesture mid-drag in some browsers, which cancels pointer
+  // capture on the element itself. Listening on window sidesteps that —
+  // the drag keeps tracking regardless of what the pointer is technically over.
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
 }
 
 function loadSavedPresets() {
