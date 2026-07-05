@@ -55,6 +55,25 @@
       </div>
     </div>
     <button type="button" id="eq-reset" class="btn-ghost">Reset</button>
+    <button type="button" id="eq-advanced-open" class="btn-ghost">Advanced</button>
+  </div>
+
+  <div id="eq-advanced" class="eq-advanced-overlay" hidden>
+    <div class="eq-advanced-header">
+      <button type="button" id="eq-advanced-back" class="icon-btn">‹</button>
+      <input type="text" id="eq-preset-name" class="eq-preset-name-input" value="Custom" />
+      <button type="button" id="eq-advanced-reset" class="icon-btn" title="Reset all bands">⟲</button>
+    </div>
+
+    <div class="eq-advanced-freqs" id="eq-advanced-freqs"></div>
+    <svg id="eq-advanced-graph" class="eq-advanced-graph" viewBox="0 0 760 260" preserveAspectRatio="none"></svg>
+    <div class="eq-advanced-range-labels">
+      <span>Low</span><span>Mid</span><span>High</span>
+    </div>
+
+    <div class="eq-advanced-presets" id="eq-advanced-presets"></div>
+
+    <button type="button" id="eq-advanced-save" class="btn btn-primary eq-save-btn">Save preset</button>
   </div>
 
   <script type="module" src="app.js"></script>
