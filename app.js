@@ -431,14 +431,22 @@ function renderDashboard() {
     return;
   }
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = (currentUserDoc?.displayName || "").split(" ")[0] || "";
+
   mountAppFrame(
     "home",
     `
+    <div class="hero-banner">
+      <p class="eyebrow">${greeting}</p>
+      <h1>${firstName}</h1>
+    </div>
     <div class="dash-grid">
     <section class="dash-col">
       <p class="eyebrow">Live Grid</p>
       <h2>Upcoming shows</h2>
-      <div id="concerts-list" class="stack">
+      <div id="concerts-list" class="card-row">
         <p class="empty-state">No shows on the board yet — follow some artists and they'll turn up here the moment one's announced.</p>
       </div>
     </section>
@@ -460,7 +468,7 @@ function renderDashboard() {
     <section class="dash-col" style="grid-column: 1 / -1;">
       <p class="eyebrow">Discover</p>
       <h2>New on AMP</h2>
-      <div id="browse-tracks-list" class="stack">
+      <div id="browse-tracks-list" class="card-row">
         <p class="empty-state">No tracks published yet.</p>
       </div>
     </section>
@@ -482,9 +490,7 @@ async function loadDashboardData() {
     const visible = concerts.filter((c) => artistInfo[c.artistId]?.active);
 
     if (visible.length) {
-      document.getElementById("concerts-list").innerHTML = visible
-        .map((c) => `<div class="list-item"><strong>${c.venueName}</strong><span class="meta">${c.description || ""}</span></div>`)
-        .join("");
+      document.getElementById("concerts-list").innerHTML = visible.map((c) => concertCardHtml(c)).join("");
     }
   }
 
@@ -1442,6 +1448,37 @@ function trackRowHtml(track, artistLabel, coverArt, artistId) {
     </div>`;
 }
 
+// ---------- Card-style renderers (home dashboard's Live Grid + Discover rows) ----------
+// Distinct from trackRowHtml: this is the image-forward "card" presentation
+// from the reference design, used only where a horizontal card row makes
+// sense. Everywhere else (search, playlists, artist "Popular") stays a list —
+// matches how the reference itself treats those as lists, not cards.
+
+function trackCardHtml(track, artistLabel, coverArt, artistId) {
+  trackCache[track.id] = { ...track, artistLabel, coverArt };
+  const artClass = coverArt ? "track-card-art" : "track-card-art track-card-art-placeholder";
+  const artStyle = coverArt ? ` style="background-image:url('${coverArt}')"` : "";
+  return `
+    <div class="track-card">
+      <div class="${artClass}"${artStyle}>
+        <button type="button" class="track-card-play btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
+      </div>
+      <strong class="track-card-title">${track.title}</strong>
+      <span class="meta">${artistLabel ? `<button type="button" class="artist-link" data-artist-id="${artistId}">${artistLabel}</button>` : ""}</span>
+    </div>`;
+}
+
+function concertCardHtml(concert) {
+  const artClass = concert.bannerImage ? "track-card-art" : "track-card-art track-card-art-placeholder";
+  const artStyle = concert.bannerImage ? ` style="background-image:url('${concert.bannerImage}')"` : "";
+  return `
+    <div class="track-card">
+      <div class="${artClass}"${artStyle}></div>
+      <strong class="track-card-title">${concert.venueName}</strong>
+      <span class="meta">${concert.description || ""}</span>
+    </div>`;
+}
+
 function wirePlayButtons(container) {
   container.querySelectorAll(".btn-play").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1528,7 +1565,7 @@ async function loadBrowseTracks(containerId) {
   const list = document.getElementById(containerId);
   if (!visible.length) return; // leave the default empty-state message in place
 
-  list.innerHTML = visible.map((t) => trackRowHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId], t.artistId)).join("");
+  list.innerHTML = visible.map((t) => trackCardHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId], t.artistId)).join("");
   wirePlayButtons(list);
 }
 
