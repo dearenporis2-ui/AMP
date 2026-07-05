@@ -349,15 +349,17 @@ function renderDashboard() {
 async function loadDashboardData() {
   const concertsSnap = await getDocs(query(collection(db, "concerts")));
   if (!concertsSnap.empty) {
-    const list = document.getElementById("concerts-list");
-    list.innerHTML = "";
-    concertsSnap.forEach((docSnap) => {
-      const c = docSnap.data();
-      const item = document.createElement("div");
-      item.className = "list-item";
-      item.innerHTML = `<strong>${c.venueName}</strong><span class="meta">${c.description || ""}</span>`;
-      list.appendChild(item);
-    });
+    const concerts = concertsSnap.docs.map((d) => d.data());
+    const artistInfo = await fetchArtistInfo([...new Set(concerts.map((c) => c.artistId))]);
+    // Only artists an admin has activated show up on the public Live Grid —
+    // this is the actual visibility gate, not just cosmetic filtering.
+    const visible = concerts.filter((c) => artistInfo[c.artistId]?.active);
+
+    if (visible.length) {
+      document.getElementById("concerts-list").innerHTML = visible
+        .map((c) => `<div class="list-item"><strong>${c.venueName}</strong><span class="meta">${c.description || ""}</span></div>`)
+        .join("");
+    }
   }
 
   const followsSnap = await getDocs(query(collection(db, "follows"), where("fanId", "==", currentUser.uid)));
@@ -374,6 +376,38 @@ async function loadDashboardData() {
   }
 
   await loadBrowseTracks("browse-tracks-list");
+}
+
+// ---------- Shared: artist activation status + album art lookups ----------
+// Firestore can't join, so these fetch the small set of unique artists/albums
+// referenced by whatever list is on screen, once per render, rather than once
+// per track — keeps the read count sane on a busy discover list.
+
+async function fetchArtistInfo(artistIds) {
+  const info = {};
+  await Promise.all(
+    artistIds.map(async (aid) => {
+      const snap = await getDoc(doc(db, "users", aid));
+      if (snap.exists()) {
+        const data = snap.data();
+        info[aid] = { name: data.displayName || "Unknown artist", active: data.artistMetadata?.isActive === true };
+      } else {
+        info[aid] = { name: "Unknown artist", active: false };
+      }
+    })
+  );
+  return info;
+}
+
+async function fetchAlbumArt(albumIds) {
+  const map = {};
+  await Promise.all(
+    albumIds.filter(Boolean).map(async (id) => {
+      const snap = await getDoc(doc(db, "albums", id));
+      map[id] = snap.exists() ? snap.data().coverArt || null : null;
+    })
+  );
+  return map;
 }
 
 function renderOnboarding() {
@@ -431,9 +465,14 @@ function renderPanel() {
   }
 
   const meta = currentUserDoc.artistMetadata || {};
-  let badgeHtml = `<span class="badge">Pending verification</span>`;
-  if (meta.isVerified && meta.isActive) badgeHtml = `<span class="badge badge-pro">Pro</span>`;
-  else if (!meta.isActive) badgeHtml = `<span class="badge">Inactive — billing needed</span>`;
+  let badgeHtml;
+  if (meta.isActive && meta.isVerified) {
+    badgeHtml = `<span class="badge badge-pro">Pro</span>`;
+  } else if (meta.isActive) {
+    badgeHtml = `<span class="badge badge-live"><span class="status-dot"></span>Live on AMP</span>`;
+  } else {
+    badgeHtml = `<span class="badge badge-pending"><span class="status-dot pulsing"></span>Awaiting approval</span>`;
+  }
 
   view.innerHTML = `
     <div class="app-shell">
@@ -613,6 +652,15 @@ function playTrack(track, artistLabel, btn) {
   document.getElementById("player-track-title").textContent = track.title;
   document.getElementById("player-track-artist").textContent = artistLabel || "";
   styleRangeFill(document.getElementById("player-seek"), 0);
+
+  const artEl = document.querySelector(".player-art");
+  if (track.coverArt) {
+    artEl.style.backgroundImage = `url('${track.coverArt}')`;
+    artEl.classList.remove("player-art-placeholder");
+  } else {
+    artEl.style.backgroundImage = "none";
+    artEl.classList.add("player-art-placeholder");
+  }
 
   incrementPlayCount(track.id);
 }
@@ -943,13 +991,19 @@ async function incrementPlayCount(trackId) {
   }
 }
 
-function trackRowHtml(track, artistLabel) {
-  trackCache[track.id] = { ...track, artistLabel };
+function trackRowHtml(track, artistLabel, coverArt) {
+  trackCache[track.id] = { ...track, artistLabel, coverArt };
+  const thumbHtml = coverArt
+    ? `<div class="track-thumb" style="background-image:url('${coverArt}')"></div>`
+    : `<div class="track-thumb track-thumb-placeholder"></div>`;
   return `
     <div class="list-item track-row">
-      <div>
-        <strong>${track.title}</strong>
-        <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
+      <div class="track-row-main">
+        ${thumbHtml}
+        <div>
+          <strong>${track.title}</strong>
+          <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
+        </div>
       </div>
       <button type="button" class="btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
     </div>`;
@@ -969,18 +1023,17 @@ async function loadBrowseTracks(containerId) {
   if (snap.empty) return; // leave the default empty-state message in place
 
   const tracks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const artistIds = [...new Set(tracks.map((t) => t.artistId))];
-  const artistNames = {};
+  const artistInfo = await fetchArtistInfo([...new Set(tracks.map((t) => t.artistId))]);
+  const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
 
-  await Promise.all(
-    artistIds.map(async (aid) => {
-      const aSnap = await getDoc(doc(db, "users", aid));
-      artistNames[aid] = aSnap.exists() ? aSnap.data().displayName || "Unknown artist" : "Unknown artist";
-    })
-  );
+  // Same activation gate as concerts — an artist an admin hasn't activated
+  // yet doesn't surface here, even though the track document already exists.
+  const visible = tracks.filter((t) => artistInfo[t.artistId]?.active);
 
   const list = document.getElementById(containerId);
-  list.innerHTML = tracks.map((t) => trackRowHtml(t, artistNames[t.artistId])).join("");
+  if (!visible.length) return; // leave the default empty-state message in place
+
+  list.innerHTML = visible.map((t) => trackRowHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId])).join("");
   wirePlayButtons(list);
 }
 
@@ -1012,7 +1065,7 @@ async function loadAlbums() {
         <button type="button" class="btn btn-secondary upload-tracks-btn" data-album-id="${album.id}" style="display:none; margin-top:10px;">Upload tracks</button>
       </div>`;
     container.appendChild(card);
-    loadTracksForAlbum(album.id);
+    loadTracksForAlbum(album.id, album.coverArt);
   }
 
   container.querySelectorAll(".track-file-input").forEach((input) => {
@@ -1023,7 +1076,7 @@ async function loadAlbums() {
   });
 }
 
-async function loadTracksForAlbum(albumId) {
+async function loadTracksForAlbum(albumId, coverArt) {
   const snap = await getDocs(query(collection(db, "tracks"), where("albumId", "==", albumId)));
   const list = document.getElementById(`tracks-${albumId}`);
   if (!list) return;
@@ -1033,7 +1086,7 @@ async function loadTracksForAlbum(albumId) {
     return;
   }
   const tracks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  list.innerHTML = tracks.map((t) => trackRowHtml(t)).join("");
+  list.innerHTML = tracks.map((t) => trackRowHtml(t, null, coverArt)).join("");
   wirePlayButtons(list);
 }
 
@@ -1139,7 +1192,8 @@ async function handleUploadTracks(e) {
     document.querySelector(`.track-file-input[data-album-id="${albumId}"]`).value = "";
     document.getElementById(`pen-${albumId}`).innerHTML = "";
     btn.style.display = "none";
-    loadTracksForAlbum(albumId);
+    const albumSnap = await getDoc(doc(db, "albums", albumId));
+    loadTracksForAlbum(albumId, albumSnap.exists() ? albumSnap.data().coverArt : null);
   } catch (err) {
     console.error("Track upload failed:", err);
     alert("Some tracks didn't upload. Please try again.");
