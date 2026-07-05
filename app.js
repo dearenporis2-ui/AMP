@@ -545,8 +545,17 @@ async function loadMyConcerts() {
 const player = new Audio();
 player.crossOrigin = "anonymous"; // needed for Web Audio to read Cloudinary's cross-origin stream
 
+const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_FREQ_LABELS = ["32", "64", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
+const BAND_GROUPS = { bass: [0, 1, 2, 3], mid: [4, 5, 6], treble: [7, 8, 9] };
+const BUILT_IN_PRESETS = [
+  { name: "Flat", gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: "Bass Boost", gains: [8, 7, 6, 4, 1, 0, 0, -1, -1, -1] },
+  { name: "Vocal Clarity", gains: [-2, -2, -1, 0, 2, 4, 4, 2, 0, -1] }
+];
+
 let audioCtx = null;
-let bassFilter, midFilter, trebleFilter;
+let eqFilters = []; // 10 chained BiquadFilterNodes, one per EQ_FREQUENCIES entry
 let currentTrackId = null;
 let currentPlayBtn = null;
 let currentTrackMeta = null;
@@ -559,23 +568,21 @@ function initAudioGraph() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const source = audioCtx.createMediaElementSource(player);
 
-  bassFilter = audioCtx.createBiquadFilter();
-  bassFilter.type = "lowshelf";
-  bassFilter.frequency.value = 200;
+  eqFilters = EQ_FREQUENCIES.map((freq) => {
+    const f = audioCtx.createBiquadFilter();
+    f.type = "peaking";
+    f.frequency.value = freq;
+    f.Q.value = 1.4;
+    f.gain.value = 0;
+    return f;
+  });
 
-  midFilter = audioCtx.createBiquadFilter();
-  midFilter.type = "peaking";
-  midFilter.frequency.value = 1000;
-  midFilter.Q.value = 0.7;
-
-  trebleFilter = audioCtx.createBiquadFilter();
-  trebleFilter.type = "highshelf";
-  trebleFilter.frequency.value = 4000;
-
-  source.connect(bassFilter);
-  bassFilter.connect(midFilter);
-  midFilter.connect(trebleFilter);
-  trebleFilter.connect(audioCtx.destination);
+  let node = source;
+  eqFilters.forEach((f) => {
+    node.connect(f);
+    node = f;
+  });
+  node.connect(audioCtx.destination);
 }
 
 function setBtnPlaying(btn, isPlaying) {
@@ -633,6 +640,192 @@ player.addEventListener("loadedmetadata", () => {
   document.getElementById("player-duration").textContent = formatDuration(player.duration);
 });
 
+// ---------- EQ: shared helpers between the quick panel and advanced view ----------
+
+function currentGains() {
+  // Before the audio graph exists (nothing's played yet), treat everything as flat.
+  return eqFilters.length ? eqFilters.map((f) => f.gain.value) : new Array(10).fill(0);
+}
+
+function setBandGain(index, value) {
+  initAudioGraph();
+  eqFilters[index].gain.value = value;
+}
+
+function setGroupGain(indices, value) {
+  initAudioGraph();
+  indices.forEach((i) => { eqFilters[i].gain.value = value; });
+}
+
+function resetAllBands() {
+  initAudioGraph();
+  eqFilters.forEach((f) => { f.gain.value = 0; });
+  syncQuickPanelFromFilters();
+  if (!document.getElementById("eq-advanced").hidden) renderAdvancedGraph();
+}
+
+function syncQuickPanelFromFilters() {
+  const gains = currentGains();
+  const avg = (indices) => indices.reduce((sum, i) => sum + gains[i], 0) / indices.length;
+
+  const bassEl = document.getElementById("eq-bass");
+  const midEl = document.getElementById("eq-mid");
+  const trebleEl = document.getElementById("eq-treble");
+  const bassValue = document.getElementById("eq-bass-value");
+  const midValue = document.getElementById("eq-mid-value");
+  const trebleValue = document.getElementById("eq-treble-value");
+
+  const bassAvg = Math.round(avg(BAND_GROUPS.bass));
+  const midAvg = Math.round(avg(BAND_GROUPS.mid));
+  const trebleAvg = Math.round(avg(BAND_GROUPS.treble));
+
+  bassEl.value = bassAvg;
+  midEl.value = midAvg;
+  trebleEl.value = trebleAvg;
+  bassValue.textContent = `${bassAvg > 0 ? "+" : ""}${bassAvg}dB`;
+  midValue.textContent = `${midAvg > 0 ? "+" : ""}${midAvg}dB`;
+  trebleValue.textContent = `${trebleAvg > 0 ? "+" : ""}${trebleAvg}dB`;
+  styleRangeFill(bassEl, ((bassAvg + 15) / 30) * 100, true);
+  styleRangeFill(midEl, ((midAvg + 15) / 30) * 100, true);
+  styleRangeFill(trebleEl, ((trebleAvg + 15) / 30) * 100, true);
+}
+
+// ---------- Advanced 10-band graphic EQ ----------
+
+const EQ_GRAPH_W = 760;
+const EQ_GRAPH_H = 260;
+const EQ_MARGIN_X = 30;
+
+function eqFreqX(i) {
+  return EQ_MARGIN_X + (i * (EQ_GRAPH_W - 2 * EQ_MARGIN_X)) / (EQ_FREQUENCIES.length - 1);
+}
+
+function eqGainY(gain) {
+  return EQ_GRAPH_H / 2 - (gain / 15) * (EQ_GRAPH_H / 2 - 12);
+}
+
+function eqYToGain(y) {
+  const raw = ((EQ_GRAPH_H / 2 - y) / (EQ_GRAPH_H / 2 - 12)) * 15;
+  return Math.max(-15, Math.min(15, raw));
+}
+
+function renderAdvancedFreqLabels() {
+  const container = document.getElementById("eq-advanced-freqs");
+  container.innerHTML = EQ_FREQUENCIES.map((_, i) => {
+    const pct = (eqFreqX(i) / EQ_GRAPH_W) * 100;
+    return `<span class="eq-freq-label" style="left:${pct}%">${EQ_FREQ_LABELS[i]}</span>`;
+  }).join("");
+}
+
+function renderAdvancedGraph() {
+  const svg = document.getElementById("eq-advanced-graph");
+  const gains = currentGains();
+  const points = gains.map((g, i) => ({ x: eqFreqX(i), y: eqGainY(g) }));
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  const zeroY = eqGainY(0);
+
+  const gridlines = EQ_FREQUENCIES.map((_, i) => {
+    const x = eqFreqX(i);
+    return `<line x1="${x}" y1="0" x2="${x}" y2="${EQ_GRAPH_H}" class="eq-gridline" />`;
+  }).join("");
+
+  svg.innerHTML = `
+    ${gridlines}
+    <line x1="0" y1="${zeroY}" x2="${EQ_GRAPH_W}" y2="${zeroY}" class="eq-zeroline" />
+    <path d="${pathD}" class="eq-curve-path" />
+    ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="9" class="eq-node" data-index="${i}"></circle>`).join("")}
+  `;
+
+  svg.querySelectorAll(".eq-node").forEach((node) => {
+    node.addEventListener("pointerdown", startEqDrag);
+  });
+}
+
+function startEqDrag(e) {
+  const node = e.currentTarget;
+  const index = Number(node.dataset.index);
+  node.setPointerCapture(e.pointerId);
+
+  function onMove(ev) {
+    const svg = document.getElementById("eq-advanced-graph");
+    const rect = svg.getBoundingClientRect();
+    const y = ((ev.clientY - rect.top) / rect.height) * EQ_GRAPH_H;
+    setBandGain(index, eqYToGain(y));
+    renderAdvancedGraph();
+    syncQuickPanelFromFilters();
+  }
+  function onUp() {
+    node.removeEventListener("pointermove", onMove);
+    node.removeEventListener("pointerup", onUp);
+  }
+  node.addEventListener("pointermove", onMove);
+  node.addEventListener("pointerup", onUp);
+}
+
+function loadSavedPresets() {
+  try {
+    return JSON.parse(localStorage.getItem("amp_eq_presets") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function savePreset(name, gains) {
+  const saved = loadSavedPresets().filter((p) => p.name !== name);
+  saved.push({ name, gains });
+  localStorage.setItem("amp_eq_presets", JSON.stringify(saved));
+  renderPresetList();
+}
+
+function applyPreset(gains) {
+  initAudioGraph();
+  gains.forEach((g, i) => { eqFilters[i].gain.value = g; });
+  renderAdvancedGraph();
+  syncQuickPanelFromFilters();
+}
+
+function renderPresetList() {
+  const container = document.getElementById("eq-advanced-presets");
+  const all = [...BUILT_IN_PRESETS, ...loadSavedPresets()];
+  container.innerHTML = all
+    .map((p) => `<button type="button" class="eq-preset-chip" data-gains='${JSON.stringify(p.gains)}'>${p.name}</button>`)
+    .join("");
+  container.querySelectorAll(".eq-preset-chip").forEach((chip) => {
+    chip.addEventListener("click", () => applyPreset(JSON.parse(chip.dataset.gains)));
+  });
+}
+
+function initAdvancedEq() {
+  const openBtn = document.getElementById("eq-advanced-open");
+  const backBtn = document.getElementById("eq-advanced-back");
+  const resetBtn = document.getElementById("eq-advanced-reset");
+  const saveBtn = document.getElementById("eq-advanced-save");
+  const overlay = document.getElementById("eq-advanced");
+  const eqPanel = document.getElementById("eq-panel");
+
+  renderAdvancedFreqLabels();
+  renderPresetList();
+
+  openBtn.addEventListener("click", () => {
+    eqPanel.hidden = true;
+    overlay.hidden = false;
+    initAudioGraph();
+    renderAdvancedGraph();
+  });
+
+  backBtn.addEventListener("click", () => {
+    overlay.hidden = true;
+    eqPanel.hidden = false;
+  });
+
+  resetBtn.addEventListener("click", resetAllBands);
+
+  saveBtn.addEventListener("click", () => {
+    const name = document.getElementById("eq-preset-name").value.trim() || "Custom";
+    savePreset(name, currentGains());
+  });
+}
+
 function initPlayerBarControls() {
   const playPauseBtn = document.getElementById("player-playpause");
   const seekEl = document.getElementById("player-seek");
@@ -682,45 +875,32 @@ function initPlayerBarControls() {
 
   eqToggle.addEventListener("click", () => {
     eqPanel.hidden = !eqPanel.hidden;
+    if (!eqPanel.hidden) syncQuickPanelFromFilters();
   });
 
-  // EQ sliders run -15..15 but the vertical fill is drawn on a 0..100 scale,
-  // so map the raw value to a fill percentage: 0dB sits at the midpoint.
   function eqFillPct(value) {
     return ((Number(value) + 15) / 30) * 100;
   }
 
   bassEl.addEventListener("input", () => {
-    initAudioGraph();
-    bassFilter.gain.value = Number(bassEl.value);
+    setGroupGain(BAND_GROUPS.bass, Number(bassEl.value));
     bassValue.textContent = `${bassEl.value > 0 ? "+" : ""}${bassEl.value}dB`;
     styleRangeFill(bassEl, eqFillPct(bassEl.value), true);
   });
   midEl.addEventListener("input", () => {
-    initAudioGraph();
-    midFilter.gain.value = Number(midEl.value);
+    setGroupGain(BAND_GROUPS.mid, Number(midEl.value));
     midValue.textContent = `${midEl.value > 0 ? "+" : ""}${midEl.value}dB`;
     styleRangeFill(midEl, eqFillPct(midEl.value), true);
   });
   trebleEl.addEventListener("input", () => {
-    initAudioGraph();
-    trebleFilter.gain.value = Number(trebleEl.value);
+    setGroupGain(BAND_GROUPS.treble, Number(trebleEl.value));
     trebleValue.textContent = `${trebleEl.value > 0 ? "+" : ""}${trebleEl.value}dB`;
     styleRangeFill(trebleEl, eqFillPct(trebleEl.value), true);
   });
 
-  eqReset.addEventListener("click", () => {
-    [bassEl, midEl, trebleEl].forEach((el) => {
-      el.value = 0;
-      styleRangeFill(el, 50, true);
-    });
-    bassValue.textContent = "0dB";
-    midValue.textContent = "0dB";
-    trebleValue.textContent = "0dB";
-    if (bassFilter) bassFilter.gain.value = 0;
-    if (midFilter) midFilter.gain.value = 0;
-    if (trebleFilter) trebleFilter.gain.value = 0;
-  });
+  eqReset.addEventListener("click", resetAllBands);
+
+  initAdvancedEq();
 }
 
 initPlayerBarControls();
