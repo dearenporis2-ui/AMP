@@ -1307,3 +1307,78 @@ h2 {
   margin-top: 14px;
   max-width: 160px;
 }
+
+/* ==========================================================================
+   Hero greeting banner + image-forward cards
+   ========================================================================== */
+
+.hero-banner {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(255, 122, 69, 0.22), rgba(255, 77, 141, 0.16)), var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.hero-banner .eyebrow {
+  margin-bottom: 4px;
+}
+
+.hero-banner h1 {
+  font-size: 34px;
+  margin: 0;
+}
+
+.card-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.track-card {
+  flex-shrink: 0;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-card-art {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: var(--radius-md);
+  background-size: cover;
+  background-position: center;
+}
+
+.track-card-art-placeholder {
+  background: var(--gradient-action);
+}
+
+.track-card-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 38px;
+  height: 38px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.track-card:hover .track-card-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.track-card-title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
