@@ -19,11 +19,14 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  deleteDoc,
   collection,
   addDoc,
   query,
   where,
   getDocs,
+  arrayUnion,
+  arrayRemove,
   Timestamp,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -35,6 +38,9 @@ const PLAY_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v
 const PAUSE_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>`;
 const VOLUME_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2V6z" fill="currentColor" stroke="none"/><path d="M10.5 5.5a4 4 0 0 1 0 5"/><path d="M12.3 3.7a6.8 6.8 0 0 1 0 8.6"/></svg>`;
 const EQ_ICON = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="13" x2="3" y2="7"/><circle cx="3" cy="5" r="1.5" fill="currentColor" stroke="none"/><line x1="8" y1="13" x2="8" y2="3"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><line x1="13" y1="13" x2="13" y2="9"/><circle cx="13" cy="6" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+const HEART_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 13.5s-5.5-3.3-5.5-7A3.2 3.2 0 0 1 8 4.3 3.2 3.2 0 0 1 13.5 6.5c0 3.7-5.5 7-5.5 7z"/></svg>`;
+const HEART_FILLED_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 13.5s-5.5-3.3-5.5-7A3.2 3.2 0 0 1 8 4.3 3.2 3.2 0 0 1 13.5 6.5c0 3.7-5.5 7-5.5 7z"/></svg>`;
+const SEARCH_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.3" y1="10.3" x2="14" y2="14"/></svg>`;
 
 const view = document.getElementById("view");
 
@@ -76,7 +82,7 @@ onAuthStateChanged(auth, async (user) => {
   renderRoute();
 });
 
-const PROTECTED_ROUTES = ["/dashboard", "/onboarding", "/panel", "/role-select"];
+const PROTECTED_ROUTES = ["/dashboard", "/onboarding", "/panel", "/role-select", "/search"];
 
 function renderRoute() {
   const path = location.hash.replace(/^#/, "") || "/";
@@ -86,8 +92,15 @@ function renderRoute() {
     return;
   }
 
-  if (PROTECTED_ROUTES.includes(path) && !currentUser) {
+  const isArtistProfileRoute = path.startsWith("/artist/");
+
+  if ((PROTECTED_ROUTES.includes(path) || isArtistProfileRoute) && !currentUser) {
     navigate("/");
+    return;
+  }
+
+  if (isArtistProfileRoute) {
+    renderArtistProfile(path.slice("/artist/".length));
     return;
   }
 
@@ -112,6 +125,9 @@ function renderRoute() {
       break;
     case "/panel":
       renderPanel();
+      break;
+    case "/search":
+      renderSearch();
       break;
     default:
       renderLanding();
@@ -306,6 +322,7 @@ function renderDashboard() {
       <header class="topbar">
         <span class="brand-mark small">AMP</span>
         <div class="topbar-right">
+          <button type="button" class="btn-icon-only" id="search-nav-btn" title="Search">${SEARCH_ICON}</button>
           <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
           <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
         </div>
@@ -321,8 +338,9 @@ function renderDashboard() {
         <section class="dash-col">
           <p class="eyebrow">Following</p>
           <h2>New from artists you follow</h2>
+          <div id="concert-alert-banner"></div>
           <div id="following-list" class="stack">
-            <p class="empty-state">You're not following anyone yet. Find an artist's profile and hit Follow to start building your feed.</p>
+            <p class="empty-state">You're not following anyone yet. Search for an artist and hit Follow to start building your feed.</p>
           </div>
         </section>
         <section class="dash-col">
@@ -343,10 +361,13 @@ function renderDashboard() {
     </div>`;
 
   document.getElementById("signout-btn").addEventListener("click", handleSignOut);
+  document.getElementById("search-nav-btn").addEventListener("click", () => navigate("/search"));
   loadDashboardData();
 }
 
 async function loadDashboardData() {
+  await loadMyFavorites();
+
   const concertsSnap = await getDocs(query(collection(db, "concerts")));
   if (!concertsSnap.empty) {
     const concerts = concertsSnap.docs.map((d) => d.data());
@@ -364,18 +385,103 @@ async function loadDashboardData() {
 
   const followsSnap = await getDocs(query(collection(db, "follows"), where("fanId", "==", currentUser.uid)));
   if (!followsSnap.empty) {
-    document.getElementById("following-list").innerHTML =
-      `<p class="empty-state">Following ${followsSnap.size} artist${followsSnap.size === 1 ? "" : "s"} — new releases will surface here.</p>`;
+    const artistIds = followsSnap.docs.map((d) => d.data().artistId);
+    await renderFollowingSection(artistIds);
   }
 
-  const playlistSnap = await getDocs(query(collection(db, "playlists"), where("ownerId", "==", currentUser.uid)));
-  if (!playlistSnap.empty) {
-    const trackCount = playlistSnap.docs[0].data().trackIds?.length || 0;
-    document.getElementById("playlist-list").innerHTML =
-      `<p class="empty-state">${trackCount} track${trackCount === 1 ? "" : "s"} saved.</p>`;
-  }
+  await renderFavoritesSection();
 
   await loadBrowseTracks("browse-tracks-list");
+}
+
+async function renderFollowingSection(artistIds) {
+  // Firestore's `in` operator caps at 10 values — fine at this platform's
+  // current scale, but a fan following more than 10 artists would only see
+  // concerts for the first 10 here. Worth revisiting if that ever becomes real.
+  const capped = artistIds.slice(0, 10);
+  const artistInfo = await fetchArtistInfo(capped);
+  const concertsSnap = await getDocs(query(collection(db, "concerts"), where("artistId", "in", capped)));
+  const concertsByArtist = {};
+  concertsSnap.docs.forEach((d) => {
+    const c = d.data();
+    const when = c.eventDate?.toDate ? c.eventDate.toDate() : null;
+    if (!when || when.getTime() < Date.now()) return; // only upcoming shows
+    if (!concertsByArtist[c.artistId] || when < concertsByArtist[c.artistId]) {
+      concertsByArtist[c.artistId] = when;
+    }
+  });
+
+  const list = document.getElementById("following-list");
+  list.innerHTML = capped
+    .map((aid) => {
+      const info = artistInfo[aid];
+      if (!info) return "";
+      const nextShow = concertsByArtist[aid];
+      const sub = nextShow ? `Next show ${nextShow.toLocaleDateString()}` : "No upcoming shows";
+      return `
+        <div class="list-item">
+          <button type="button" class="artist-link" data-artist-id="${aid}"><strong>${info.name}</strong></button>
+          <span class="meta">${sub}</span>
+        </div>`;
+    })
+    .join("");
+  wireArtistLinks(list);
+
+  renderConcertAlertBanner(capped, concertsByArtist);
+}
+
+async function renderFavoritesSection() {
+  const list = document.getElementById("playlist-list");
+  const trackIds = [...myFavoriteTrackIds];
+  if (!trackIds.length) return; // leave the default empty-state message
+
+  const trackDocs = await Promise.all(trackIds.map((id) => getDoc(doc(db, "tracks", id))));
+  const tracks = trackDocs.filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
+  if (!tracks.length) return;
+
+  const artistInfo = await fetchArtistInfo([...new Set(tracks.map((t) => t.artistId))]);
+  const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
+
+  list.innerHTML = tracks
+    .map((t) => trackRowHtml(t, artistInfo[t.artistId]?.name, albumArt[t.albumId], t.artistId))
+    .join("");
+  wirePlayButtons(list);
+}
+
+// ---------- Concert alerts (in-app only — see README for the real-push caveat) ----------
+
+function renderConcertAlertBanner(artistIds, concertsByArtist) {
+  const banner = document.getElementById("concert-alert-banner");
+  if (!banner) return;
+
+  const soon = Object.entries(concertsByArtist).filter(
+    ([, date]) => date.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000
+  );
+
+  if (typeof Notification === "undefined") {
+    banner.innerHTML = "";
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    banner.innerHTML = "";
+    if (soon.length && !sessionStorage.getItem("amp_concert_alert_shown")) {
+      new Notification("Upcoming show on AMP", { body: "A followed artist has a show coming up this week." });
+      sessionStorage.setItem("amp_concert_alert_shown", "1");
+    }
+    return;
+  }
+
+  if (Notification.permission === "denied") {
+    banner.innerHTML = "";
+    return;
+  }
+
+  banner.innerHTML = `<button type="button" class="btn-ghost eq-save-btn" id="enable-alerts-btn" style="margin-bottom:12px;">Enable show alerts</button>`;
+  document.getElementById("enable-alerts-btn").addEventListener("click", async () => {
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") renderConcertAlertBanner(artistIds, concertsByArtist);
+  });
 }
 
 // ---------- Shared: artist activation status + album art lookups ----------
@@ -523,7 +629,7 @@ function renderPanel() {
 
   document.getElementById("signout-btn").addEventListener("click", handleSignOut);
   loadMyConcerts();
-  loadAlbums();
+  loadMyFavorites().then(loadAlbums);
 
   document.getElementById("album-form").addEventListener("submit", handleCreateAlbum);
 
@@ -557,6 +663,209 @@ function renderPanel() {
       submitBtn.textContent = "Publish to the Live Grid";
     }
   });
+}
+
+// ---------- Follow / unfollow ----------
+
+async function isFollowing(artistId) {
+  const followId = `${currentUser.uid}_${artistId}`;
+  const snap = await getDoc(doc(db, "follows", followId));
+  return snap.exists();
+}
+
+async function toggleFollow(artistId, btn) {
+  const followId = `${currentUser.uid}_${artistId}`;
+  const ref = doc(db, "follows", followId);
+  btn.disabled = true;
+
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await deleteDoc(ref);
+      btn.textContent = "Follow";
+      btn.classList.remove("btn-following");
+    } else {
+      await setDoc(ref, { followId, fanId: currentUser.uid, artistId, timestamp: serverTimestamp() });
+      btn.textContent = "Following";
+      btn.classList.add("btn-following");
+    }
+  } catch (err) {
+    console.error("Couldn't update follow status:", err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- Artist profile ----------
+
+async function renderArtistProfile(artistId) {
+  view.innerHTML = `<div class="screen"><p class="tagline">Loading…</p></div>`;
+
+  const artistSnap = await getDoc(doc(db, "users", artistId));
+  if (!artistSnap.exists() || artistSnap.data().role !== "ARTIST") {
+    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">Artist not found.</p><a class="btn btn-secondary" href="#/dashboard">Back to dashboard</a></div></div>`;
+    return;
+  }
+
+  const artist = artistSnap.data();
+  const meta = artist.artistMetadata || {};
+
+  if (!meta.isActive) {
+    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">This artist isn't public yet — check back soon.</p><a class="btn btn-secondary" href="#/dashboard">Back to dashboard</a></div></div>`;
+    return;
+  }
+
+  await loadMyFavorites();
+  const alreadyFollowing = await isFollowing(artistId);
+
+  const genresHtml = (meta.genres || []).map((g) => `<span class="genre-tag">${g}</span>`).join("");
+
+  view.innerHTML = `
+    <div class="app-shell">
+      <header class="topbar">
+        <span class="brand-mark small">AMP</span>
+        <div class="topbar-right">
+          <button type="button" class="btn-ghost" id="profile-back-btn">Back</button>
+        </div>
+      </header>
+      <main class="profile-layout">
+        <section class="dash-col profile-header">
+          <div class="profile-header-row">
+            <div>
+              <p class="eyebrow">Artist${meta.isVerified ? " · Verified" : ""}</p>
+              <h1>${artist.displayName}</h1>
+              ${meta.bio ? `<p class="tagline" style="text-align:left;">${meta.bio}</p>` : ""}
+              <div class="genre-tags">${genresHtml}</div>
+            </div>
+            <button type="button" class="btn ${alreadyFollowing ? "btn-secondary btn-following" : "btn-primary"}" id="follow-btn">
+              ${alreadyFollowing ? "Following" : "Follow"}
+            </button>
+          </div>
+        </section>
+
+        <section class="dash-col">
+          <p class="eyebrow">Shows</p>
+          <h2>Upcoming</h2>
+          <div id="profile-concerts" class="stack">
+            <p class="empty-state">No shows announced right now.</p>
+          </div>
+        </section>
+
+        <section class="dash-col" style="grid-column: 1 / -1;">
+          <p class="eyebrow">Music</p>
+          <h2>Tracks</h2>
+          <div id="profile-tracks" class="stack">
+            <p class="empty-state">No tracks published yet.</p>
+          </div>
+        </section>
+      </main>
+    </div>`;
+
+  document.getElementById("profile-back-btn").addEventListener("click", () => navigate("/dashboard"));
+  document.getElementById("follow-btn").addEventListener("click", (e) => toggleFollow(artistId, e.currentTarget));
+
+  // Upcoming concerts for this artist
+  const concertsSnap = await getDocs(query(collection(db, "concerts"), where("artistId", "==", artistId)));
+  const upcoming = concertsSnap.docs
+    .map((d) => d.data())
+    .filter((c) => c.eventDate?.toDate && c.eventDate.toDate().getTime() > Date.now())
+    .sort((a, b) => a.eventDate.toDate() - b.eventDate.toDate());
+  if (upcoming.length) {
+    document.getElementById("profile-concerts").innerHTML = upcoming
+      .map((c) => `<div class="list-item"><strong>${c.venueName}</strong><span class="meta">${c.eventDate.toDate().toLocaleDateString()} · ${c.description || ""}</span></div>`)
+      .join("");
+  }
+
+  // Tracks
+  const tracksSnap = await getDocs(query(collection(db, "tracks"), where("artistId", "==", artistId)));
+  if (!tracksSnap.empty) {
+    const tracks = tracksSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
+    const tracksList = document.getElementById("profile-tracks");
+    tracksList.innerHTML = tracks.map((t) => trackRowHtml(t, null, albumArt[t.albumId], artistId)).join("");
+    wirePlayButtons(tracksList);
+  }
+}
+
+// ---------- Search ----------
+
+function renderSearch() {
+  view.innerHTML = `
+    <div class="app-shell">
+      <header class="topbar">
+        <span class="brand-mark small">AMP</span>
+        <div class="topbar-right">
+          <button type="button" class="btn-ghost" id="search-back-btn">Back</button>
+        </div>
+      </header>
+      <main class="search-layout">
+        <div class="search-input-wrap">
+          ${SEARCH_ICON}
+          <input type="text" id="search-input" placeholder="Search artists or tracks…" autofocus />
+        </div>
+        <div id="search-results" class="stack" style="margin-top:20px;">
+          <p class="empty-state">Start typing to search AMP.</p>
+        </div>
+      </main>
+    </div>`;
+
+  document.getElementById("search-back-btn").addEventListener("click", () => navigate("/dashboard"));
+
+  let debounceHandle = null;
+  document.getElementById("search-input").addEventListener("input", (e) => {
+    clearTimeout(debounceHandle);
+    const term = e.target.value.trim();
+    if (!term) {
+      document.getElementById("search-results").innerHTML = `<p class="empty-state">Start typing to search AMP.</p>`;
+      return;
+    }
+    debounceHandle = setTimeout(() => performSearch(term), 300);
+  });
+}
+
+async function performSearch(term) {
+  const resultsEl = document.getElementById("search-results");
+  resultsEl.innerHTML = `<p class="empty-state">Searching…</p>`;
+  const lower = term.toLowerCase();
+
+  await loadMyFavorites();
+
+  // Artists — client-side substring filter. Fine at this platform's current
+  // scale; a full collection scan on every keystroke would need a real
+  // search index (e.g. Algolia) if the artist roster grows substantially.
+  const usersSnap = await getDocs(query(collection(db, "users"), where("role", "==", "ARTIST")));
+  const artists = usersSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((a) => a.artistMetadata?.isActive === true && a.displayName?.toLowerCase().includes(lower));
+
+  const tracksSnap = await getDocs(query(collection(db, "tracks")));
+  const allTracks = tracksSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const titleMatches = allTracks.filter((t) => t.title?.toLowerCase().includes(lower));
+  const artistInfo = await fetchArtistInfo([...new Set(titleMatches.map((t) => t.artistId))]);
+  const visibleTracks = titleMatches.filter((t) => artistInfo[t.artistId]?.active);
+  const albumArt = await fetchAlbumArt([...new Set(visibleTracks.map((t) => t.albumId))]);
+
+  if (!artists.length && !visibleTracks.length) {
+    resultsEl.innerHTML = `<p class="empty-state">No matches for "${term}".</p>`;
+    return;
+  }
+
+  let html = "";
+  if (artists.length) {
+    html += `<p class="eyebrow" style="margin-top:4px;">Artists</p>`;
+    html += artists
+      .map((a) => `<div class="list-item"><button type="button" class="artist-link" data-artist-id="${a.id}"><strong>${a.displayName}</strong></button></div>`)
+      .join("");
+  }
+  if (visibleTracks.length) {
+    html += `<p class="eyebrow" style="margin-top:16px;">Tracks</p>`;
+    html += visibleTracks
+      .map((t) => trackRowHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId], t.artistId))
+      .join("");
+  }
+
+  resultsEl.innerHTML = html;
+  wirePlayButtons(resultsEl);
 }
 
 async function loadMyConcerts() {
@@ -991,21 +1300,28 @@ async function incrementPlayCount(trackId) {
   }
 }
 
-function trackRowHtml(track, artistLabel, coverArt) {
+function trackRowHtml(track, artistLabel, coverArt, artistId) {
   trackCache[track.id] = { ...track, artistLabel, coverArt };
   const thumbHtml = coverArt
     ? `<div class="track-thumb" style="background-image:url('${coverArt}')"></div>`
     : `<div class="track-thumb track-thumb-placeholder"></div>`;
+  const isFav = myFavoriteTrackIds.has(track.id);
+  const artistHtml = artistLabel
+    ? `<button type="button" class="artist-link" data-artist-id="${artistId}">${artistLabel}</button> · `
+    : "";
   return `
     <div class="list-item track-row">
       <div class="track-row-main">
         ${thumbHtml}
         <div>
           <strong>${track.title}</strong>
-          <span class="meta">${artistLabel ? artistLabel + " · " : ""}${track.duration || ""}</span>
+          <span class="meta">${artistHtml}${track.duration || ""}</span>
         </div>
       </div>
-      <button type="button" class="btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
+      <div class="track-row-actions">
+        <button type="button" class="btn-heart${isFav ? " is-favorited" : ""}" data-track-id="${track.id}">${isFav ? HEART_FILLED_ICON : HEART_ICON}</button>
+        <button type="button" class="btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
+      </div>
     </div>`;
 }
 
@@ -1016,6 +1332,68 @@ function wirePlayButtons(container) {
       if (track) playTrack(track, track.artistLabel, btn);
     });
   });
+  container.querySelectorAll(".btn-heart").forEach((btn) => {
+    btn.addEventListener("click", () => toggleFavorite(btn.dataset.trackId, btn));
+  });
+  wireArtistLinks(container);
+}
+
+function wireArtistLinks(container) {
+  container.querySelectorAll(".artist-link").forEach((btn) => {
+    btn.addEventListener("click", () => navigate(`/artist/${btn.dataset.artistId}`));
+  });
+}
+
+// ---------- Favorites (heart) ----------
+// Cached in memory per view load rather than re-queried on every render —
+// refreshed by loadMyFavorites(), called once at the top of any screen that
+// shows track rows, so the heart's filled/empty state is accurate everywhere.
+
+let myFavoriteTrackIds = new Set();
+let myFavoritePlaylistId = null;
+
+async function loadMyFavorites() {
+  const snap = await getDocs(query(collection(db, "playlists"), where("ownerId", "==", currentUser.uid)));
+  if (snap.empty) {
+    myFavoriteTrackIds = new Set();
+    myFavoritePlaylistId = null;
+    return;
+  }
+  myFavoritePlaylistId = snap.docs[0].id;
+  myFavoriteTrackIds = new Set(snap.docs[0].data().trackIds || []);
+}
+
+async function toggleFavorite(trackId, btn) {
+  const isFav = myFavoriteTrackIds.has(trackId);
+  btn.disabled = true;
+
+  try {
+    if (myFavoritePlaylistId) {
+      await updateDoc(doc(db, "playlists", myFavoritePlaylistId), {
+        trackIds: isFav ? arrayRemove(trackId) : arrayUnion(trackId),
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      const ref = await addDoc(collection(db, "playlists"), {
+        ownerId: currentUser.uid,
+        title: "My Favorites",
+        trackIds: [trackId],
+        updatedAt: serverTimestamp()
+      });
+      myFavoritePlaylistId = ref.id;
+    }
+
+    if (isFav) myFavoriteTrackIds.delete(trackId);
+    else myFavoriteTrackIds.add(trackId);
+
+    const stillFav = myFavoriteTrackIds.has(trackId);
+    btn.innerHTML = stillFav ? HEART_FILLED_ICON : HEART_ICON;
+    btn.classList.toggle("is-favorited", stillFav);
+  } catch (err) {
+    console.error("Couldn't update favorites:", err);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function loadBrowseTracks(containerId) {
@@ -1033,7 +1411,7 @@ async function loadBrowseTracks(containerId) {
   const list = document.getElementById(containerId);
   if (!visible.length) return; // leave the default empty-state message in place
 
-  list.innerHTML = visible.map((t) => trackRowHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId])).join("");
+  list.innerHTML = visible.map((t) => trackRowHtml(t, artistInfo[t.artistId].name, albumArt[t.albumId], t.artistId)).join("");
   wirePlayButtons(list);
 }
 
@@ -1086,7 +1464,7 @@ async function loadTracksForAlbum(albumId, coverArt) {
     return;
   }
   const tracks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  list.innerHTML = tracks.map((t) => trackRowHtml(t, null, coverArt)).join("");
+  list.innerHTML = tracks.map((t) => trackRowHtml(t, null, coverArt, currentUser.uid)).join("");
   wirePlayButtons(list);
 }
 
