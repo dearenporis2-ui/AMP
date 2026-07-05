@@ -41,6 +41,7 @@ const EQ_ICON = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" str
 const HEART_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 13.5s-5.5-3.3-5.5-7A3.2 3.2 0 0 1 8 4.3 3.2 3.2 0 0 1 13.5 6.5c0 3.7-5.5 7-5.5 7z"/></svg>`;
 const HEART_FILLED_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 13.5s-5.5-3.3-5.5-7A3.2 3.2 0 0 1 8 4.3 3.2 3.2 0 0 1 13.5 6.5c0 3.7-5.5 7-5.5 7z"/></svg>`;
 const SEARCH_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><line x1="10.3" y1="10.3" x2="14" y2="14"/></svg>`;
+const HOME_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5L8 2l6 5.5"/><path d="M3.5 6.5V14h9V6.5"/></svg>`;
 
 const view = document.getElementById("view");
 
@@ -93,14 +94,20 @@ function renderRoute() {
   }
 
   const isArtistProfileRoute = path.startsWith("/artist/");
+  const isPlaylistRoute = path.startsWith("/playlist/");
 
-  if ((PROTECTED_ROUTES.includes(path) || isArtistProfileRoute) && !currentUser) {
+  if ((PROTECTED_ROUTES.includes(path) || isArtistProfileRoute || isPlaylistRoute) && !currentUser) {
     navigate("/");
     return;
   }
 
   if (isArtistProfileRoute) {
     renderArtistProfile(path.slice("/artist/".length));
+    return;
+  }
+
+  if (isPlaylistRoute) {
+    renderPlaylist(path.slice("/playlist/".length));
     return;
   }
 
@@ -311,57 +318,155 @@ function renderRoleSelect() {
   document.getElementById("artist-btn").addEventListener("click", (e) => completeRoleSelection("ARTIST", e.currentTarget));
 }
 
+// ==========================================================================
+// App frame — persistent sidebar + library, shared by every signed-in view
+// ==========================================================================
+
+function mountAppFrame(activeKey, contentHtml) {
+  view.innerHTML = `
+    <div class="app-frame">
+      <aside class="sidebar">
+        <div class="sidebar-brand"><span class="brand-mark small">AMP</span></div>
+        <nav class="sidebar-nav">
+          <button type="button" class="sidebar-nav-item${activeKey === "home" ? " active" : ""}" id="nav-home">${HOME_ICON}<span>Home</span></button>
+          <button type="button" class="sidebar-nav-item${activeKey === "search" ? " active" : ""}" id="nav-search">${SEARCH_ICON}<span>Search</span></button>
+        </nav>
+        <div class="sidebar-library">
+          <div class="sidebar-library-header">
+            <span>Your Library</span>
+            <button type="button" class="btn-icon-only" id="create-playlist-btn" title="Create playlist">+</button>
+          </div>
+          <div id="sidebar-playlists" class="sidebar-playlists"><p class="empty-state" style="padding:4px 2px;">Loading…</p></div>
+        </div>
+      </aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
+          <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
+        </header>
+        <div class="app-content">${contentHtml}</div>
+      </div>
+    </div>`;
+
+  document.getElementById("nav-home").addEventListener("click", () => navigate("/dashboard"));
+  document.getElementById("nav-search").addEventListener("click", () => navigate("/search"));
+  document.getElementById("signout-btn").addEventListener("click", handleSignOut);
+  document.getElementById("create-playlist-btn").addEventListener("click", createPlaylist);
+  loadSidebarPlaylists();
+}
+
+async function loadSidebarPlaylists() {
+  const container = document.getElementById("sidebar-playlists");
+  if (!container) return;
+
+  const snap = await getDocs(query(collection(db, "playlists"), where("ownerId", "==", currentUser.uid)));
+  const playlists = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  if (!playlists.length) {
+    container.innerHTML = `<p class="empty-state" style="padding:4px 2px;">No playlists yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = playlists
+    .map((p) => `<button type="button" class="sidebar-playlist-item" data-playlist-id="${p.id}">${p.title}</button>`)
+    .join("");
+  container.querySelectorAll(".sidebar-playlist-item").forEach((btn) => {
+    btn.addEventListener("click", () => navigate(`/playlist/${btn.dataset.playlistId}`));
+  });
+}
+
+async function createPlaylist() {
+  const name = prompt("Playlist name");
+  if (!name || !name.trim()) return;
+
+  await addDoc(collection(db, "playlists"), {
+    ownerId: currentUser.uid,
+    title: name.trim(),
+    trackIds: [],
+    updatedAt: serverTimestamp()
+  });
+  loadSidebarPlaylists();
+}
+
+async function renderPlaylist(playlistId) {
+  const snap = await getDoc(doc(db, "playlists", playlistId));
+  if (!snap.exists() || snap.data().ownerId !== currentUser.uid) {
+    navigate("/dashboard");
+    return;
+  }
+  const playlist = snap.data();
+  await loadMyFavorites();
+
+  mountAppFrame(
+    "library",
+    `
+    <section class="dash-col">
+      <p class="eyebrow">Playlist</p>
+      <h1>${playlist.title}</h1>
+      <div id="playlist-tracks" class="stack" style="margin-top:18px;">
+        <p class="empty-state">This playlist is empty — add tracks from Search or Discover.</p>
+      </div>
+    </section>`
+  );
+
+  const trackIds = playlist.trackIds || [];
+  if (!trackIds.length) return;
+
+  const trackDocs = await Promise.all(trackIds.map((id) => getDoc(doc(db, "tracks", id))));
+  const tracks = trackDocs.filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
+  if (!tracks.length) return;
+
+  const artistInfo = await fetchArtistInfo([...new Set(tracks.map((t) => t.artistId))]);
+  const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
+  const list = document.getElementById("playlist-tracks");
+  list.innerHTML = tracks
+    .map((t) => trackRowHtml(t, artistInfo[t.artistId]?.name, albumArt[t.albumId], t.artistId))
+    .join("");
+  wirePlayButtons(list);
+}
+
 function renderDashboard() {
   if (currentUserDoc?.role === "ARTIST") {
     navigate("/panel");
     return;
   }
 
-  view.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar">
-        <span class="brand-mark small">AMP</span>
-        <div class="topbar-right">
-          <button type="button" class="btn-icon-only" id="search-nav-btn" title="Search">${SEARCH_ICON}</button>
-          <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
-          <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
-        </div>
-      </header>
-      <main class="dash-grid">
-        <section class="dash-col">
-          <p class="eyebrow">Live Grid</p>
-          <h2>Upcoming shows</h2>
-          <div id="concerts-list" class="stack">
-            <p class="empty-state">No shows on the board yet — follow some artists and they'll turn up here the moment one's announced.</p>
-          </div>
-        </section>
-        <section class="dash-col">
-          <p class="eyebrow">Following</p>
-          <h2>New from artists you follow</h2>
-          <div id="concert-alert-banner"></div>
-          <div id="following-list" class="stack">
-            <p class="empty-state">You're not following anyone yet. Search for an artist and hit Follow to start building your feed.</p>
-          </div>
-        </section>
-        <section class="dash-col">
-          <p class="eyebrow">Your library</p>
-          <h2>Favorites</h2>
-          <div id="playlist-list" class="stack">
-            <p class="empty-state">Tap the heart on any track to start your favorites.</p>
-          </div>
-        </section>
-        <section class="dash-col" style="grid-column: 1 / -1;">
-          <p class="eyebrow">Discover</p>
-          <h2>Tracks on AMP</h2>
-          <div id="browse-tracks-list" class="stack">
-            <p class="empty-state">No tracks published yet.</p>
-          </div>
-        </section>
-      </main>
-    </div>`;
+  mountAppFrame(
+    "home",
+    `
+    <div class="dash-grid">
+    <section class="dash-col">
+      <p class="eyebrow">Live Grid</p>
+      <h2>Upcoming shows</h2>
+      <div id="concerts-list" class="stack">
+        <p class="empty-state">No shows on the board yet — follow some artists and they'll turn up here the moment one's announced.</p>
+      </div>
+    </section>
+    <section class="dash-col">
+      <p class="eyebrow">Following</p>
+      <h2>New from artists you follow</h2>
+      <div id="concert-alert-banner"></div>
+      <div id="following-list" class="stack">
+        <p class="empty-state">You're not following anyone yet. Search for an artist and hit Follow to start building your feed.</p>
+      </div>
+    </section>
+    <section class="dash-col" style="grid-column: 1 / -1;">
+      <p class="eyebrow">Jump back in</p>
+      <h2>Recently played</h2>
+      <div id="recent-plays-list" class="stack">
+        <p class="empty-state">Nothing played yet this session.</p>
+      </div>
+    </section>
+    <section class="dash-col" style="grid-column: 1 / -1;">
+      <p class="eyebrow">Discover</p>
+      <h2>New on AMP</h2>
+      <div id="browse-tracks-list" class="stack">
+        <p class="empty-state">No tracks published yet.</p>
+      </div>
+    </section>
+    </div>`
+  );
 
-  document.getElementById("signout-btn").addEventListener("click", handleSignOut);
-  document.getElementById("search-nav-btn").addEventListener("click", () => navigate("/search"));
   loadDashboardData();
 }
 
@@ -389,7 +494,7 @@ async function loadDashboardData() {
     await renderFollowingSection(artistIds);
   }
 
-  await renderFavoritesSection();
+  renderRecentPlays();
 
   await loadBrowseTracks("browse-tracks-list");
 }
@@ -430,22 +535,40 @@ async function renderFollowingSection(artistIds) {
   renderConcertAlertBanner(capped, concertsByArtist);
 }
 
-async function renderFavoritesSection() {
-  const list = document.getElementById("playlist-list");
-  const trackIds = [...myFavoriteTrackIds];
-  if (!trackIds.length) return; // leave the default empty-state message
+function renderRecentPlays() {
+  const list = document.getElementById("recent-plays-list");
+  if (!list) return;
 
-  const trackDocs = await Promise.all(trackIds.map((id) => getDoc(doc(db, "tracks", id))));
-  const tracks = trackDocs.filter((s) => s.exists()).map((s) => ({ id: s.id, ...s.data() }));
-  if (!tracks.length) return;
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem("amp_recent_plays") || "[]");
+  } catch {
+    recent = [];
+  }
+  if (!recent.length) return; // leave the default empty-state message
 
-  const artistInfo = await fetchArtistInfo([...new Set(tracks.map((t) => t.artistId))]);
-  const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
-
-  list.innerHTML = tracks
-    .map((t) => trackRowHtml(t, artistInfo[t.artistId]?.name, albumArt[t.albumId], t.artistId))
+  list.innerHTML = recent
+    .map((t) => trackRowHtml(t, t.artistLabel, t.coverArt, t.artistId))
     .join("");
   wirePlayButtons(list);
+}
+
+function recordRecentPlay(track) {
+  try {
+    let recent = JSON.parse(localStorage.getItem("amp_recent_plays") || "[]");
+    recent = recent.filter((r) => r.id !== track.id);
+    recent.unshift({
+      id: track.id,
+      title: track.title,
+      duration: track.duration,
+      artistLabel: track.artistLabel,
+      coverArt: track.coverArt,
+      artistId: track.artistId
+    });
+    localStorage.setItem("amp_recent_plays", JSON.stringify(recent.slice(0, 6)));
+  } catch {
+    // Non-critical — recent plays are a convenience feature, never worth failing playback over.
+  }
 }
 
 // ---------- Concert alerts (in-app only — see README for the real-push caveat) ----------
@@ -580,54 +703,51 @@ function renderPanel() {
     badgeHtml = `<span class="badge badge-pending"><span class="status-dot pulsing"></span>Awaiting approval</span>`;
   }
 
-  view.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar">
-        <span class="brand-mark small">AMP</span>
-        <div class="topbar-right">${badgeHtml}<button type="button" class="btn-ghost" id="signout-btn">Sign out</button></div>
-      </header>
-      <main class="panel-layout">
-        <section class="dash-col">
-          <p class="eyebrow">Publish</p>
-          <h2>Announce a show</h2>
-          <form id="concert-form" novalidate>
-            <div data-error hidden></div>
-            <div class="field"><label for="venueName">Venue</label><input type="text" id="venueName" name="venueName" required /></div>
-            <div class="field"><label for="eventDate">Date &amp; time</label><input type="datetime-local" id="eventDate" name="eventDate" required /></div>
-            <div class="field"><label for="description">Details</label><input type="text" id="description" name="description" placeholder="What should fans know?" /></div>
-            <div class="field"><label for="ticketLink">Ticket link (optional)</label><input type="url" id="ticketLink" name="ticketLink" placeholder="https://…" /></div>
-            <div class="field"><label for="bannerFile">Event banner (optional)</label><input type="file" id="bannerFile" name="bannerFile" accept="image/*" /></div>
-            <button type="submit" class="btn btn-primary" data-submit data-default-label="Publish to the Live Grid">Publish to the Live Grid</button>
-          </form>
-        </section>
-        <section class="dash-col">
-          <p class="eyebrow">Your shows</p>
-          <h2>Published concerts</h2>
-          <div id="my-concerts" class="stack">
-            <p class="empty-state">Nothing published yet — your first show will appear here.</p>
-          </div>
-        </section>
-        <section class="dash-col" style="grid-column: 1 / -1;">
-          <p class="eyebrow">Music</p>
-          <h2>Albums &amp; tracks</h2>
+  mountAppFrame(
+    "home",
+    `
+    <div class="panel-status-row">${badgeHtml}</div>
+    <div class="panel-layout">
+    <section class="dash-col">
+      <p class="eyebrow">Publish</p>
+      <h2>Announce a show</h2>
+      <form id="concert-form" novalidate>
+        <div data-error hidden></div>
+        <div class="field"><label for="venueName">Venue</label><input type="text" id="venueName" name="venueName" required /></div>
+        <div class="field"><label for="eventDate">Date &amp; time</label><input type="datetime-local" id="eventDate" name="eventDate" required /></div>
+        <div class="field"><label for="description">Details</label><input type="text" id="description" name="description" placeholder="What should fans know?" /></div>
+        <div class="field"><label for="ticketLink">Ticket link (optional)</label><input type="url" id="ticketLink" name="ticketLink" placeholder="https://…" /></div>
+        <div class="field"><label for="bannerFile">Event banner (optional)</label><input type="file" id="bannerFile" name="bannerFile" accept="image/*" /></div>
+        <button type="submit" class="btn btn-primary" data-submit data-default-label="Publish to the Live Grid">Publish to the Live Grid</button>
+      </form>
+    </section>
+    <section class="dash-col">
+      <p class="eyebrow">Your shows</p>
+      <h2>Published concerts</h2>
+      <div id="my-concerts" class="stack">
+        <p class="empty-state">Nothing published yet — your first show will appear here.</p>
+      </div>
+    </section>
+    <section class="dash-col" style="grid-column: 1 / -1;">
+      <p class="eyebrow">Music</p>
+      <h2>Albums &amp; tracks</h2>
 
-          <form id="album-form" class="album-form-inline">
-            <div data-error hidden></div>
-            <div class="field"><label for="albumTitle">Album title</label><input type="text" id="albumTitle" name="albumTitle" required /></div>
-            <div class="field"><label for="releaseYear">Release year</label><input type="number" id="releaseYear" name="releaseYear" min="1950" max="2100" /></div>
-            <div class="field"><label for="coverArtFile">Cover art (optional)</label><input type="file" id="coverArtFile" name="coverArtFile" accept="image/*" /></div>
-            <label class="checkbox-row"><input type="checkbox" id="isExclusive" name="isExclusive" /> Platform-exclusive (unreleased elsewhere)</label>
-            <button type="submit" class="btn btn-secondary" data-submit data-default-label="Create album">Create album</button>
-          </form>
+      <form id="album-form" class="album-form-inline">
+        <div data-error hidden></div>
+        <div class="field"><label for="albumTitle">Album title</label><input type="text" id="albumTitle" name="albumTitle" required /></div>
+        <div class="field"><label for="releaseYear">Release year</label><input type="number" id="releaseYear" name="releaseYear" min="1950" max="2100" /></div>
+        <div class="field"><label for="coverArtFile">Cover art (optional)</label><input type="file" id="coverArtFile" name="coverArtFile" accept="image/*" /></div>
+        <label class="checkbox-row"><input type="checkbox" id="isExclusive" name="isExclusive" /> Platform-exclusive (unreleased elsewhere)</label>
+        <button type="submit" class="btn btn-secondary" data-submit data-default-label="Create album">Create album</button>
+      </form>
 
-          <div id="albums-list" class="stack" style="margin-top:20px;">
-            <p class="empty-state">No albums yet — create one above, then upload tracks into it.</p>
-          </div>
-        </section>
-      </main>
-    </div>`;
+      <div id="albums-list" class="stack" style="margin-top:20px;">
+        <p class="empty-state">No albums yet — create one above, then upload tracks into it.</p>
+      </div>
+    </section>
+    </div>`
+  );
 
-  document.getElementById("signout-btn").addEventListener("click", handleSignOut);
   loadMyConcerts();
   loadMyFavorites().then(loadAlbums);
 
@@ -716,52 +836,50 @@ async function renderArtistProfile(artistId) {
   }
 
   await loadMyFavorites();
-  const alreadyFollowing = await isFollowing(artistId);
-
+  const [alreadyFollowing, followerCount] = await Promise.all([isFollowing(artistId), getFollowerCount(artistId)]);
   const genresHtml = (meta.genres || []).map((g) => `<span class="genre-tag">${g}</span>`).join("");
+  const avatarHtml = meta.profileImage
+    ? `<div class="profile-avatar" style="background-image:url('${meta.profileImage}')"></div>`
+    : `<div class="profile-avatar profile-avatar-placeholder"></div>`;
 
-  view.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar">
-        <span class="brand-mark small">AMP</span>
-        <div class="topbar-right">
-          <button type="button" class="btn-ghost" id="profile-back-btn">Back</button>
+  mountAppFrame(
+    "",
+    `
+    <div class="profile-layout">
+    <section class="dash-col profile-header">
+      <div class="profile-header-row">
+        ${avatarHtml}
+        <div class="profile-header-text">
+          <p class="eyebrow">${meta.isVerified ? "✓ Verified Artist" : "Artist"}</p>
+          <h1>${artist.displayName}</h1>
+          <p class="meta">${followerCount} follower${followerCount === 1 ? "" : "s"}</p>
+          ${meta.bio ? `<p class="tagline" style="text-align:left;">${meta.bio}</p>` : ""}
+          <div class="genre-tags">${genresHtml}</div>
+          <button type="button" class="btn ${alreadyFollowing ? "btn-secondary btn-following" : "btn-primary"} profile-follow-btn" id="follow-btn">
+            ${alreadyFollowing ? "Following" : "Follow"}
+          </button>
         </div>
-      </header>
-      <main class="profile-layout">
-        <section class="dash-col profile-header">
-          <div class="profile-header-row">
-            <div>
-              <p class="eyebrow">Artist${meta.isVerified ? " · Verified" : ""}</p>
-              <h1>${artist.displayName}</h1>
-              ${meta.bio ? `<p class="tagline" style="text-align:left;">${meta.bio}</p>` : ""}
-              <div class="genre-tags">${genresHtml}</div>
-            </div>
-            <button type="button" class="btn ${alreadyFollowing ? "btn-secondary btn-following" : "btn-primary"}" id="follow-btn">
-              ${alreadyFollowing ? "Following" : "Follow"}
-            </button>
-          </div>
-        </section>
+      </div>
+    </section>
 
-        <section class="dash-col">
-          <p class="eyebrow">Shows</p>
-          <h2>Upcoming</h2>
-          <div id="profile-concerts" class="stack">
-            <p class="empty-state">No shows announced right now.</p>
-          </div>
-        </section>
+    <section class="dash-col">
+      <p class="eyebrow">Shows</p>
+      <h2>Upcoming</h2>
+      <div id="profile-concerts" class="stack">
+        <p class="empty-state">No shows announced right now.</p>
+      </div>
+    </section>
 
-        <section class="dash-col" style="grid-column: 1 / -1;">
-          <p class="eyebrow">Music</p>
-          <h2>Tracks</h2>
-          <div id="profile-tracks" class="stack">
-            <p class="empty-state">No tracks published yet.</p>
-          </div>
-        </section>
-      </main>
-    </div>`;
+    <section class="dash-col" style="grid-column: 1 / -1;">
+      <p class="eyebrow">Music</p>
+      <h2>Popular</h2>
+      <div id="profile-tracks" class="stack">
+        <p class="empty-state">No tracks published yet.</p>
+      </div>
+    </section>
+    </div>`
+  );
 
-  document.getElementById("profile-back-btn").addEventListener("click", () => navigate("/dashboard"));
   document.getElementById("follow-btn").addEventListener("click", (e) => toggleFollow(artistId, e.currentTarget));
 
   // Upcoming concerts for this artist
@@ -776,10 +894,12 @@ async function renderArtistProfile(artistId) {
       .join("");
   }
 
-  // Tracks
+  // Tracks, ranked by play count — closest honest equivalent to a "Popular" list
   const tracksSnap = await getDocs(query(collection(db, "tracks"), where("artistId", "==", artistId)));
   if (!tracksSnap.empty) {
-    const tracks = tracksSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const tracks = tracksSnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
     const albumArt = await fetchAlbumArt([...new Set(tracks.map((t) => t.albumId))]);
     const tracksList = document.getElementById("profile-tracks");
     tracksList.innerHTML = tracks.map((t) => trackRowHtml(t, null, albumArt[t.albumId], artistId)).join("");
@@ -787,29 +907,25 @@ async function renderArtistProfile(artistId) {
   }
 }
 
+async function getFollowerCount(artistId) {
+  const snap = await getDocs(query(collection(db, "follows"), where("artistId", "==", artistId)));
+  return snap.size;
+}
+
 // ---------- Search ----------
 
 function renderSearch() {
-  view.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar">
-        <span class="brand-mark small">AMP</span>
-        <div class="topbar-right">
-          <button type="button" class="btn-ghost" id="search-back-btn">Back</button>
-        </div>
-      </header>
-      <main class="search-layout">
-        <div class="search-input-wrap">
-          ${SEARCH_ICON}
-          <input type="text" id="search-input" placeholder="Search artists or tracks…" autofocus />
-        </div>
-        <div id="search-results" class="stack" style="margin-top:20px;">
-          <p class="empty-state">Start typing to search AMP.</p>
-        </div>
-      </main>
-    </div>`;
-
-  document.getElementById("search-back-btn").addEventListener("click", () => navigate("/dashboard"));
+  mountAppFrame(
+    "search",
+    `
+    <div class="search-input-wrap">
+      ${SEARCH_ICON}
+      <input type="text" id="search-input" placeholder="Search artists or tracks…" autofocus />
+    </div>
+    <div id="search-results" class="stack" style="margin-top:20px;">
+      <p class="empty-state">Start typing to search AMP.</p>
+    </div>`
+  );
 
   let debounceHandle = null;
   document.getElementById("search-input").addEventListener("input", (e) => {
@@ -972,6 +1088,7 @@ function playTrack(track, artistLabel, btn) {
   }
 
   incrementPlayCount(track.id);
+  recordRecentPlay(track);
 }
 
 function styleRangeFill(el, pct, vertical = false) {
@@ -1376,7 +1493,7 @@ async function toggleFavorite(trackId, btn) {
     } else {
       const ref = await addDoc(collection(db, "playlists"), {
         ownerId: currentUser.uid,
-        title: "My Favorites",
+        title: "Liked Songs",
         trackIds: [trackId],
         updatedAt: serverTimestamp()
       });
