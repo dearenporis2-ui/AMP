@@ -1382,3 +1382,190 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ==========================================================================
+   Glassmorphism pass — cards, sidebar, topbar all get translucent + blur,
+   matching the treatment the player bar already had.
+   ========================================================================== */
+
+.sidebar,
+.app-topbar,
+.dash-col,
+.track-card,
+.hero-banner,
+.list-item {
+  background: rgba(19, 27, 46, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.sidebar-playlist-item:hover,
+.sidebar-nav-item:hover,
+.sidebar-nav-item.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.track-card {
+  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.track-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Top search bar
+   ========================================================================== */
+
+.topbar-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 320px;
+  text-align: left;
+}
+
+.topbar-search-btn:hover {
+  border-color: var(--hibiscus);
+  color: var(--text-primary);
+}
+
+.app-topbar {
+  justify-content: space-between !important;
+}
+
+/* ==========================================================================
+   Section headers with scroll arrows
+   ========================================================================== */
+
+.section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.section-controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.scroll-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scroll-arrow:hover {
+  border-color: var(--hibiscus);
+}
+
+/* ==========================================================================
+   Sidebar playlist thumbnails
+   ========================================================================== */
+
+.sidebar-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-playlist-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.sidebar-playlist-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.sidebar-playlist-text strong {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Hero recently-played corner widget
+   ========================================================================== */
+
+.hero-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.hero-recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.hero-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(11, 17, 30, 0.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.hero-recent-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hero-recent-text strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Bigger, more premium card sizing
+   ========================================================================== */
+
+.track-card {
+  width: 190px;
+}
+
+.track-card-art {
+  width: 190px;
+  height: 190px;
+}
