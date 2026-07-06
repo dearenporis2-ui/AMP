@@ -32,6 +32,47 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const CLOUD_NAME = "dflbqacnt";
+
+// ---------- Generated placeholder art ----------
+// Every card needs SOME art even when no real cover exists. Rather than one
+// repeated flat gradient (looked identical everywhere) or hotlinking random
+// internet photos into a live product (copyright + reliability risk), this
+// generates a small abstract SVG per item — deterministic from its own ID,
+// so the same track always looks the same, but different tracks don't.
+
+function hashSeed(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+const ART_PALETTES = [
+  ["#FF7A45", "#FF4D8D", 135],
+  ["#FF4D8D", "#FF7A45", 45],
+  ["#1B2540", "#FF4D8D", 120],
+  ["#FF7A45", "#1B2540", 200],
+  ["#0B111E", "#FF7A45", 160],
+  ["#FF4D8D", "#0B111E", 70]
+];
+
+function generatedArtSvg(seed) {
+  const hash = hashSeed(seed);
+  const [c1, c2, angle] = ART_PALETTES[hash % ART_PALETTES.length];
+  const shapeType = hash % 3;
+  let shape = "";
+  if (shapeType === 0) {
+    shape = `<circle cx="112" cy="42" r="52" fill="rgba(255,255,255,0.13)"/><circle cx="30" cy="128" r="34" fill="rgba(0,0,0,0.15)"/>`;
+  } else if (shapeType === 1) {
+    shape = `<path d="M0,100 Q40,60 80,100 T160,100 V160 H0 Z" fill="rgba(255,255,255,0.11)"/>`;
+  } else {
+    shape = `<path d="M-20,0 L60,170 M40,0 L120,170 M100,0 L180,170" stroke="rgba(255,255,255,0.09)" stroke-width="20"/>`;
+  }
+  return `<svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g${hash}" x1="0%" y1="0%" x2="100%" y2="100%" gradientTransform="rotate(${angle})"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient></defs><rect width="160" height="160" fill="url(#g${hash})"/>${shape}</svg>`;
+}
+
+function placeholderArt(seed) {
+  return `data:image/svg+xml,${encodeURIComponent(generatedArtSvg(seed))}`;
+}
 const UPLOAD_PRESET = "amp_media";
 
 const PLAY_ICON = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5-10-5.5z"/></svg>`;
@@ -341,8 +382,13 @@ function mountAppFrame(activeKey, contentHtml) {
       </aside>
       <div class="app-main">
         <header class="app-topbar">
-          <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
-          <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
+          <button type="button" class="topbar-search-btn" id="topbar-search-btn">
+            ${SEARCH_ICON}<span>What do you want to play?</span>
+          </button>
+          <div class="topbar-right">
+            <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
+            <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
+          </div>
         </header>
         <div class="app-content">${contentHtml}</div>
       </div>
@@ -350,9 +396,17 @@ function mountAppFrame(activeKey, contentHtml) {
 
   document.getElementById("nav-home").addEventListener("click", () => navigate("/dashboard"));
   document.getElementById("nav-search").addEventListener("click", () => navigate("/search"));
+  document.getElementById("topbar-search-btn").addEventListener("click", () => navigate("/search"));
   document.getElementById("signout-btn").addEventListener("click", handleSignOut);
   document.getElementById("create-playlist-btn").addEventListener("click", createPlaylist);
   loadSidebarPlaylists();
+
+  view.querySelectorAll(".scroll-arrow").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (target) target.scrollBy({ left: Number(btn.dataset.dir) * 340, behavior: "smooth" });
+    });
+  });
 }
 
 async function loadSidebarPlaylists() {
@@ -368,7 +422,16 @@ async function loadSidebarPlaylists() {
   }
 
   container.innerHTML = playlists
-    .map((p) => `<button type="button" class="sidebar-playlist-item" data-playlist-id="${p.id}">${p.title}</button>`)
+    .map(
+      (p) => `
+      <button type="button" class="sidebar-playlist-item" data-playlist-id="${p.id}">
+        <span class="sidebar-playlist-thumb" style="background-image:url('${placeholderArt(p.id)}')"></span>
+        <span class="sidebar-playlist-text">
+          <strong>${p.title}</strong>
+          <span class="meta">${(p.trackIds || []).length} song${(p.trackIds || []).length === 1 ? "" : "s"}</span>
+        </span>
+      </button>`
+    )
     .join("");
   container.querySelectorAll(".sidebar-playlist-item").forEach((btn) => {
     btn.addEventListener("click", () => navigate(`/playlist/${btn.dataset.playlistId}`));
@@ -441,11 +504,17 @@ function renderDashboard() {
     <div class="hero-banner">
       <p class="eyebrow">${greeting}</p>
       <h1>${firstName}</h1>
+      <div id="hero-recent-widget"></div>
     </div>
     <div class="dash-grid">
     <section class="dash-col">
-      <p class="eyebrow">Live Grid</p>
-      <h2>Upcoming shows</h2>
+      <div class="section-header-row">
+        <div><p class="eyebrow">Live Grid</p><h2>Upcoming shows</h2></div>
+        <div class="section-controls">
+          <button type="button" class="scroll-arrow" data-target="concerts-list" data-dir="-1">‹</button>
+          <button type="button" class="scroll-arrow" data-target="concerts-list" data-dir="1">›</button>
+        </div>
+      </div>
       <div id="concerts-list" class="card-row">
         <p class="empty-state">No shows on the board yet — follow some artists and they'll turn up here the moment one's announced.</p>
       </div>
@@ -466,8 +535,13 @@ function renderDashboard() {
       </div>
     </section>
     <section class="dash-col" style="grid-column: 1 / -1;">
-      <p class="eyebrow">Discover</p>
-      <h2>New on AMP</h2>
+      <div class="section-header-row">
+        <div><p class="eyebrow">Discover</p><h2>New on AMP</h2></div>
+        <div class="section-controls">
+          <button type="button" class="scroll-arrow" data-target="browse-tracks-list" data-dir="-1">‹</button>
+          <button type="button" class="scroll-arrow" data-target="browse-tracks-list" data-dir="1">›</button>
+        </div>
+      </div>
       <div id="browse-tracks-list" class="card-row">
         <p class="empty-state">No tracks published yet.</p>
       </div>
@@ -480,17 +554,18 @@ function renderDashboard() {
 
 async function loadDashboardData() {
   await loadMyFavorites();
+  renderHeroRecentWidget();
 
   const concertsSnap = await getDocs(query(collection(db, "concerts")));
   if (!concertsSnap.empty) {
-    const concerts = concertsSnap.docs.map((d) => d.data());
+    const concerts = concertsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const artistInfo = await fetchArtistInfo([...new Set(concerts.map((c) => c.artistId))]);
     // Only artists an admin has activated show up on the public Live Grid —
     // this is the actual visibility gate, not just cosmetic filtering.
     const visible = concerts.filter((c) => artistInfo[c.artistId]?.active);
 
     if (visible.length) {
-      document.getElementById("concerts-list").innerHTML = visible.map((c) => concertCardHtml(c)).join("");
+      document.getElementById("concerts-list").innerHTML = visible.map((c) => concertCardHtml(c, c.id)).join("");
     }
   }
 
@@ -539,6 +614,35 @@ async function renderFollowingSection(artistIds) {
   wireArtistLinks(list);
 
   renderConcertAlertBanner(capped, concertsByArtist);
+}
+
+function renderHeroRecentWidget() {
+  const widget = document.getElementById("hero-recent-widget");
+  if (!widget) return;
+
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem("amp_recent_plays") || "[]");
+  } catch {
+    recent = [];
+  }
+  if (!recent.length) return;
+
+  const t = recent[0];
+  widget.innerHTML = `
+    <div class="hero-recent-card">
+      <span class="meta">Recently played</span>
+      <div class="hero-recent-row">
+        <div class="track-thumb" style="background-image:url('${t.coverArt || placeholderArt(t.id)}')"></div>
+        <div class="hero-recent-text">
+          <strong>${t.title}</strong>
+          <span class="meta">${t.artistLabel || ""}</span>
+        </div>
+        <button type="button" class="btn-play" data-track-id="${t.id}">${PLAY_ICON}</button>
+      </div>
+    </div>`;
+  trackCache[t.id] = t;
+  wirePlayButtons(widget);
 }
 
 function renderRecentPlays() {
@@ -844,9 +948,7 @@ async function renderArtistProfile(artistId) {
   await loadMyFavorites();
   const [alreadyFollowing, followerCount] = await Promise.all([isFollowing(artistId), getFollowerCount(artistId)]);
   const genresHtml = (meta.genres || []).map((g) => `<span class="genre-tag">${g}</span>`).join("");
-  const avatarHtml = meta.profileImage
-    ? `<div class="profile-avatar" style="background-image:url('${meta.profileImage}')"></div>`
-    : `<div class="profile-avatar profile-avatar-placeholder"></div>`;
+  const avatarHtml = `<div class="profile-avatar" style="background-image:url('${meta.profileImage || placeholderArt(artistId)}')"></div>`;
 
   mountAppFrame(
     "",
@@ -1085,13 +1187,8 @@ function playTrack(track, artistLabel, btn) {
   styleRangeFill(document.getElementById("player-seek"), 0);
 
   const artEl = document.querySelector(".player-art");
-  if (track.coverArt) {
-    artEl.style.backgroundImage = `url('${track.coverArt}')`;
-    artEl.classList.remove("player-art-placeholder");
-  } else {
-    artEl.style.backgroundImage = "none";
-    artEl.classList.add("player-art-placeholder");
-  }
+  artEl.style.backgroundImage = `url('${track.coverArt || placeholderArt(track.id)}')`;
+  artEl.classList.remove("player-art-placeholder");
 
   incrementPlayCount(track.id);
   recordRecentPlay(track);
@@ -1425,9 +1522,7 @@ async function incrementPlayCount(trackId) {
 
 function trackRowHtml(track, artistLabel, coverArt, artistId) {
   trackCache[track.id] = { ...track, artistLabel, coverArt };
-  const thumbHtml = coverArt
-    ? `<div class="track-thumb" style="background-image:url('${coverArt}')"></div>`
-    : `<div class="track-thumb track-thumb-placeholder"></div>`;
+  const thumbHtml = `<div class="track-thumb" style="background-image:url('${coverArt || placeholderArt(track.id)}')"></div>`;
   const isFav = myFavoriteTrackIds.has(track.id);
   const artistHtml = artistLabel
     ? `<button type="button" class="artist-link" data-artist-id="${artistId}">${artistLabel}</button> · `
@@ -1456,11 +1551,10 @@ function trackRowHtml(track, artistLabel, coverArt, artistId) {
 
 function trackCardHtml(track, artistLabel, coverArt, artistId) {
   trackCache[track.id] = { ...track, artistLabel, coverArt };
-  const artClass = coverArt ? "track-card-art" : "track-card-art track-card-art-placeholder";
-  const artStyle = coverArt ? ` style="background-image:url('${coverArt}')"` : "";
+  const artUrl = coverArt || placeholderArt(track.id);
   return `
     <div class="track-card">
-      <div class="${artClass}"${artStyle}>
+      <div class="track-card-art" style="background-image:url('${artUrl}')">
         <button type="button" class="track-card-play btn-play" data-track-id="${track.id}">${PLAY_ICON}</button>
       </div>
       <strong class="track-card-title">${track.title}</strong>
@@ -1468,12 +1562,11 @@ function trackCardHtml(track, artistLabel, coverArt, artistId) {
     </div>`;
 }
 
-function concertCardHtml(concert) {
-  const artClass = concert.bannerImage ? "track-card-art" : "track-card-art track-card-art-placeholder";
-  const artStyle = concert.bannerImage ? ` style="background-image:url('${concert.bannerImage}')"` : "";
+function concertCardHtml(concert, seed) {
+  const artUrl = concert.bannerImage || placeholderArt(seed || concert.venueName);
   return `
     <div class="track-card">
-      <div class="${artClass}"${artStyle}></div>
+      <div class="track-card-art" style="background-image:url('${artUrl}')"></div>
       <strong class="track-card-title">${concert.venueName}</strong>
       <span class="meta">${concert.description || ""}</span>
     </div>`;
