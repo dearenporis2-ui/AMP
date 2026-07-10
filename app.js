@@ -1,5 +1,5 @@
 // app.js — AMP single-page app.
-// Hash-based routing (#/dashboard, #/panel, etc.) on purpose: GitHub Pages
+// Hash-based routing (#/, #/panel, etc.) on purpose: GitHub Pages
 // can't do server-side URL rewrites without extra config, and hash routing
 // needs none, so navigation never triggers a real page reload or a fresh
 // Firebase re-initialization. Firebase Auth initializes exactly once, and
@@ -124,7 +124,11 @@ onAuthStateChanged(auth, async (user) => {
   renderRoute();
 });
 
-const PROTECTED_ROUTES = ["/dashboard", "/onboarding", "/panel", "/role-select", "/search"];
+// Only routes that genuinely require an account stay gated. Home, Search,
+// and artist profiles are public — anonymous visitors can browse freely and
+// only get pushed to /login the moment they try something account-specific
+// (follow, favorite, create a playlist, or become an artist).
+const PROTECTED_ROUTES = ["/onboarding", "/panel", "/role-select"];
 
 function renderRoute() {
   const path = location.hash.replace(/^#/, "") || "/";
@@ -135,10 +139,10 @@ function renderRoute() {
   }
 
   const isArtistProfileRoute = path.startsWith("/artist/");
-  const isPlaylistRoute = path.startsWith("/playlist/");
+  const isPlaylistRoute = path.startsWith("/playlist/"); // playlists stay private — personal data
 
-  if ((PROTECTED_ROUTES.includes(path) || isArtistProfileRoute || isPlaylistRoute) && !currentUser) {
-    navigate("/");
+  if ((PROTECTED_ROUTES.includes(path) || isPlaylistRoute) && !currentUser) {
+    navigate("/login");
     return;
   }
 
@@ -154,7 +158,7 @@ function renderRoute() {
 
   switch (path) {
     case "/":
-      renderLanding();
+      renderDashboard();
       break;
     case "/login":
       renderLogin();
@@ -164,9 +168,6 @@ function renderRoute() {
       break;
     case "/role-select":
       renderRoleSelect();
-      break;
-    case "/dashboard":
-      renderDashboard();
       break;
     case "/onboarding":
       renderOnboarding();
@@ -178,7 +179,7 @@ function renderRoute() {
       renderSearch();
       break;
     default:
-      renderLanding();
+      renderDashboard();
   }
 }
 
@@ -261,7 +262,7 @@ function renderLoading() {
 
 function renderLanding() {
   if (currentUser && currentUserDoc) {
-    navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/dashboard");
+    navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/");
     return;
   }
   if (currentUser && !currentUserDoc) {
@@ -364,6 +365,21 @@ function renderRoleSelect() {
 // ==========================================================================
 
 function mountAppFrame(activeKey, contentHtml) {
+  const topbarRightHtml = currentUser
+    ? `<span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
+       <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>`
+    : `<button type="button" class="btn-ghost" id="topbar-login-btn">Log in</button>
+       <a class="btn btn-primary" style="padding:8px 18px;" href="#/signup">Sign up</a>`;
+
+  const libraryHtml = currentUser
+    ? `<div class="sidebar-library-header">
+         <span>Your Library</span>
+         <button type="button" class="btn-icon-only" id="create-playlist-btn" title="Create playlist">+</button>
+       </div>
+       <div id="sidebar-playlists" class="sidebar-playlists"><p class="empty-state" style="padding:4px 2px;">Loading…</p></div>`
+    : `<div class="sidebar-library-header"><span>Your Library</span></div>
+       <p class="empty-state" style="padding:4px 10px;">Log in to follow artists, save tracks, and build playlists.</p>`;
+
   view.innerHTML = `
     <div class="app-frame">
       <aside class="sidebar">
@@ -373,11 +389,7 @@ function mountAppFrame(activeKey, contentHtml) {
           <button type="button" class="sidebar-nav-item${activeKey === "search" ? " active" : ""}" id="nav-search">${SEARCH_ICON}<span>Search</span></button>
         </nav>
         <div class="sidebar-library">
-          <div class="sidebar-library-header">
-            <span>Your Library</span>
-            <button type="button" class="btn-icon-only" id="create-playlist-btn" title="Create playlist">+</button>
-          </div>
-          <div id="sidebar-playlists" class="sidebar-playlists"><p class="empty-state" style="padding:4px 2px;">Loading…</p></div>
+          ${libraryHtml}
         </div>
       </aside>
       <div class="app-main">
@@ -386,20 +398,24 @@ function mountAppFrame(activeKey, contentHtml) {
             ${SEARCH_ICON}<span>What do you want to play?</span>
           </button>
           <div class="topbar-right">
-            <span class="user-chip">${currentUserDoc?.displayName || currentUser.email}</span>
-            <button type="button" class="btn-ghost" id="signout-btn">Sign out</button>
+            ${topbarRightHtml}
           </div>
         </header>
         <div class="app-content">${contentHtml}</div>
       </div>
     </div>`;
 
-  document.getElementById("nav-home").addEventListener("click", () => navigate("/dashboard"));
+  document.getElementById("nav-home").addEventListener("click", () => navigate("/"));
   document.getElementById("nav-search").addEventListener("click", () => navigate("/search"));
   document.getElementById("topbar-search-btn").addEventListener("click", () => navigate("/search"));
-  document.getElementById("signout-btn").addEventListener("click", handleSignOut);
-  document.getElementById("create-playlist-btn").addEventListener("click", createPlaylist);
-  loadSidebarPlaylists();
+
+  if (currentUser) {
+    document.getElementById("signout-btn").addEventListener("click", handleSignOut);
+    document.getElementById("create-playlist-btn").addEventListener("click", createPlaylist);
+    loadSidebarPlaylists();
+  } else {
+    document.getElementById("topbar-login-btn").addEventListener("click", () => navigate("/login"));
+  }
 
   view.querySelectorAll(".scroll-arrow").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -454,7 +470,7 @@ async function createPlaylist() {
 async function renderPlaylist(playlistId) {
   const snap = await getDoc(doc(db, "playlists", playlistId));
   if (!snap.exists() || snap.data().ownerId !== currentUser.uid) {
-    navigate("/dashboard");
+    navigate("/");
     return;
   }
   const playlist = snap.data();
@@ -496,14 +512,14 @@ function renderDashboard() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const firstName = (currentUserDoc?.displayName || "").split(" ")[0] || "";
+  const firstName = currentUser ? (currentUserDoc?.displayName || "").split(" ")[0] || "" : "";
 
   mountAppFrame(
     "home",
     `
     <div class="hero-banner">
-      <p class="eyebrow">${greeting}</p>
-      <h1>${firstName}</h1>
+      <p class="eyebrow">${currentUser ? greeting : "Local music, live"}</p>
+      <h1>${currentUser ? firstName : "Welcome to AMP"}</h1>
       <div id="hero-recent-widget"></div>
     </div>
     <div class="dash-grid">
@@ -569,10 +585,15 @@ async function loadDashboardData() {
     }
   }
 
-  const followsSnap = await getDocs(query(collection(db, "follows"), where("fanId", "==", currentUser.uid)));
-  if (!followsSnap.empty) {
-    const artistIds = followsSnap.docs.map((d) => d.data().artistId);
-    await renderFollowingSection(artistIds);
+  if (currentUser) {
+    const followsSnap = await getDocs(query(collection(db, "follows"), where("fanId", "==", currentUser.uid)));
+    if (!followsSnap.empty) {
+      const artistIds = followsSnap.docs.map((d) => d.data().artistId);
+      await renderFollowingSection(artistIds);
+    }
+  } else {
+    const followingEl = document.getElementById("following-list");
+    if (followingEl) followingEl.innerHTML = `<p class="empty-state"><a href="#/login">Log in</a> to follow artists and see their shows here.</p>`;
   }
 
   renderRecentPlays();
@@ -799,7 +820,7 @@ function renderOnboarding() {
 
 function renderPanel() {
   if (currentUserDoc?.role !== "ARTIST") {
-    navigate("/dashboard");
+    navigate("/");
     return;
   }
 
@@ -898,12 +919,17 @@ function renderPanel() {
 // ---------- Follow / unfollow ----------
 
 async function isFollowing(artistId) {
+  if (!currentUser) return false;
   const followId = `${currentUser.uid}_${artistId}`;
   const snap = await getDoc(doc(db, "follows", followId));
   return snap.exists();
 }
 
 async function toggleFollow(artistId, btn) {
+  if (!currentUser) {
+    navigate("/login");
+    return;
+  }
   const followId = `${currentUser.uid}_${artistId}`;
   const ref = doc(db, "follows", followId);
   btn.disabled = true;
@@ -933,7 +959,7 @@ async function renderArtistProfile(artistId) {
 
   const artistSnap = await getDoc(doc(db, "users", artistId));
   if (!artistSnap.exists() || artistSnap.data().role !== "ARTIST") {
-    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">Artist not found.</p><a class="btn btn-secondary" href="#/dashboard">Back to dashboard</a></div></div>`;
+    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">Artist not found.</p><a class="btn btn-secondary" href="#/">Back to dashboard</a></div></div>`;
     return;
   }
 
@@ -941,7 +967,7 @@ async function renderArtistProfile(artistId) {
   const meta = artist.artistMetadata || {};
 
   if (!meta.isActive) {
-    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">This artist isn't public yet — check back soon.</p><a class="btn btn-secondary" href="#/dashboard">Back to dashboard</a></div></div>`;
+    view.innerHTML = `<div class="screen"><div class="card"><p class="tagline">This artist isn't public yet — check back soon.</p><a class="btn btn-secondary" href="#/">Back to dashboard</a></div></div>`;
     return;
   }
 
@@ -1600,6 +1626,11 @@ let myFavoriteTrackIds = new Set();
 let myFavoritePlaylistId = null;
 
 async function loadMyFavorites() {
+  if (!currentUser) {
+    myFavoriteTrackIds = new Set();
+    myFavoritePlaylistId = null;
+    return;
+  }
   const snap = await getDocs(query(collection(db, "playlists"), where("ownerId", "==", currentUser.uid)));
   if (snap.empty) {
     myFavoriteTrackIds = new Set();
@@ -1611,6 +1642,10 @@ async function loadMyFavorites() {
 }
 
 async function toggleFavorite(trackId, btn) {
+  if (!currentUser) {
+    navigate("/login");
+    return;
+  }
   const isFav = myFavoriteTrackIds.has(trackId);
   btn.disabled = true;
 
@@ -1891,7 +1926,7 @@ async function handleSignup(e) {
     await setDoc(doc(db, "users", credential.user.uid), userDoc);
     currentUser = credential.user;
     currentUserDoc = userDoc;
-    navigate(role === "ARTIST" ? "/onboarding" : "/dashboard");
+    navigate(role === "ARTIST" ? "/onboarding" : "/");
   } catch (err) {
     console.error("Signup failed:", err);
     showError(form, friendlyAuthError(err));
@@ -1917,7 +1952,7 @@ async function handleLogin(e) {
 
     currentUser = credential.user;
     currentUserDoc = snap.data();
-    navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/dashboard");
+    navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/");
   } catch (err) {
     console.error("Login failed:", err);
     showError(form, friendlyAuthError(err));
@@ -1936,7 +1971,7 @@ async function handleGoogleSignIn(buttonEl) {
 
     if (snap.exists()) {
       currentUserDoc = snap.data();
-      navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/dashboard");
+      navigate(currentUserDoc.role === "ARTIST" ? "/panel" : "/");
     } else {
       currentUserDoc = null;
       navigate("/role-select");
@@ -1967,7 +2002,7 @@ async function completeRoleSelection(role, buttonEl) {
 
     await setDoc(doc(db, "users", currentUser.uid), userDoc);
     currentUserDoc = userDoc;
-    navigate(role === "ARTIST" ? "/onboarding" : "/dashboard");
+    navigate(role === "ARTIST" ? "/onboarding" : "/");
   } catch (err) {
     console.error("Couldn't finish account setup:", err);
     setLoading(buttonEl, false);
