@@ -1,0 +1,1634 @@
+/* ==========================================================================
+   AMP — Design Tokens
+   Primary canvas: near-black, matching the reference exactly. Green accent
+   for actions/playback state. Purple-to-pink gradient reserved for the hero
+   banner only.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap");
+
+:root {
+  /* Canvas — near-black, matching the reference exactly */
+  --bg: #0d0d0d;
+  --surface: #181818;
+  --surface-raised: #242424;
+  --border: rgba(255, 255, 255, 0.08);
+
+  /* Type */
+  --text-primary: #ffffff;
+  --text-muted: #a7a7a7;
+
+  /* Primary action color — solid green, used for play states, active nav,
+     Follow, progress fills. This replaces the old pink/orange system. */
+  --accent-green: #1ed760;
+  --accent-green-dim: #1db954;
+
+  /* Reserved strictly for the hero banner's purple-to-pink gradient wash —
+     not used anywhere else in the UI, matching the reference's treatment. */
+  --hero-purple: #5b2a86;
+  --hero-pink: #b6396b;
+
+  /* Legacy names kept so existing component rules don't all need renaming —
+     both now resolve to the green accent instead of pink/orange. */
+  --hibiscus: #1ed760;
+  --sunset: #1db954;
+  --gradient-action: var(--accent-green);
+
+  /* Type scale */
+  --font-display: "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+/* ==========================================================================
+   Layout shell
+   ========================================================================== */
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Signature element: a soft sunset/hibiscus glow arc behind the hero,
+   evoking a waveform pulse without needing artist photography to exist yet. */
+.screen::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  width: 620px;
+  height: 620px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(30, 215, 96, 0.22) 0%, rgba(91, 42, 134, 0.16) 45%, transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px 28px;
+}
+
+/* ==========================================================================
+   Brand & type
+   ========================================================================== */
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  text-align: center;
+  margin: 0 0 6px;
+}
+
+.brand-mark {
+  background: var(--gradient-action);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tagline {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sunset);
+  margin: 0 0 8px;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.field input {
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.field input:focus {
+  outline: 2px solid var(--hibiscus);
+  outline-offset: 1px;
+}
+
+/* Role picker — segmented control for Fan / Artist at signup */
+.role-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.role-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.role-picker label {
+  display: block;
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.role-picker input:checked + label {
+  border-color: var(--hibiscus);
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--gradient-action);
+  color: #0b111e;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  margin-top: 10px;
+}
+
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--text-primary);
+  color: #14161c;
+}
+
+.btn-google:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.form-footer {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 20px;
+}
+
+.form-footer a {
+  color: var(--hibiscus);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Error state
+   ========================================================================== */
+
+[data-error] {
+  background: rgba(255, 69, 69, 0.12);
+  border: 1px solid rgba(255, 69, 69, 0.3);
+  color: #ff9b9b;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ==========================================================================
+   App shell (dashboard / panel pages)
+   ========================================================================== */
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-mark.small {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  background: var(--gradient-action);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-chip {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  padding: 28px;
+}
+
+.panel-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 28px;
+}
+
+@media (max-width: 900px) {
+  .dash-grid,
+  .panel-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.badge-pro {
+  background: var(--gradient-action);
+  color: #0b111e;
+  border: none;
+  font-weight: 600;
+}
+
+.badge-live {
+  border-color: var(--sunset);
+  color: var(--sunset);
+}
+
+.badge-pending {
+  color: var(--text-muted);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.status-dot.pulsing {
+  animation: dotPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.dash-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+}
+
+.dash-col h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.list-item {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.list-item .meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.track-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.track-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.track-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.track-thumb-placeholder {
+  background: var(--gradient-action);
+}
+
+.btn-play {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gradient-action);
+  color: #0b111e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease;
+}
+
+.btn-play:hover {
+  transform: scale(1.08);
+}
+
+.btn-play svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ==========================================================================
+   Persistent player bar
+   ========================================================================== */
+
+.player-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 14px 28px;
+  background: rgba(24, 24, 24, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.player-bar[hidden],
+.eq-panel[hidden] {
+  display: none;
+}
+
+.player-track-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 170px;
+  max-width: 230px;
+}
+
+.player-art {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.player-art-placeholder {
+  background: var(--gradient-action);
+}
+
+.player-track-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.player-track-text strong {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.btn-transport {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--gradient-action);
+  color: #0b111e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(30, 215, 96, 0.35);
+  transition: transform 0.12s ease;
+}
+
+.btn-transport:hover {
+  transform: scale(1.06);
+}
+
+.btn-transport svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 34px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.player-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.icon-volume,
+.icon-eq {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.btn-eq-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-eq-toggle:hover {
+  border-color: var(--hibiscus);
+}
+
+/* ---------- Custom range inputs (scrubber, volume, EQ bands) ---------- */
+
+.player-range {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--hibiscus) 0%, var(--surface-raised) 0%);
+  cursor: pointer;
+}
+
+.player-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s ease;
+}
+
+.player-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.player-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.player-range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+/* ==========================================================================
+   Equalizer panel
+   ========================================================================== */
+
+.eq-panel {
+  position: fixed;
+  right: 28px;
+  bottom: 84px;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: rgba(27, 37, 64, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
+}
+
+.eq-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sunset);
+  margin: 0;
+  align-self: flex-start;
+}
+
+.eq-bands {
+  display: flex;
+  gap: 22px;
+}
+
+.eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.eq-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: center;
+}
+
+.eq-band label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.eq-range {
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 4px;
+  height: 100px;
+  border-radius: 999px;
+  background: linear-gradient(to top, var(--sunset) 0%, var(--surface) 0%, var(--surface) 100%);
+  cursor: pointer;
+}
+
+.eq-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.eq-range::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border: none;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* ==========================================================================
+   Advanced 10-band graphic EQ
+   ========================================================================== */
+
+.eq-advanced-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: linear-gradient(180deg, #181818 0%, #0d0d0d 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px 32px;
+}
+
+.eq-advanced-overlay[hidden] {
+  display: none;
+}
+
+.eq-advanced-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.icon-btn {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon-btn:hover {
+  border-color: var(--hibiscus);
+}
+
+.eq-preset-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  text-align: center;
+  outline: none;
+}
+
+.eq-advanced-freqs {
+  position: relative;
+  height: 18px;
+  margin: 0 4px 4px;
+}
+
+.eq-freq-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.eq-advanced-graph {
+  width: 100%;
+  flex: 1;
+  max-height: 340px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.eq-gridline {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-dasharray: 3 4;
+}
+
+.eq-zeroline {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-dasharray: 2 3;
+}
+
+.eq-curve-path {
+  fill: none;
+  stroke: var(--hibiscus);
+  stroke-width: 2.5;
+}
+
+.eq-node {
+  fill: #ffffff;
+  stroke: var(--hibiscus);
+  stroke-width: 2;
+  cursor: grab;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+.eq-node:active {
+  cursor: grabbing;
+}
+
+.eq-advanced-range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 10px 4px 24px;
+}
+
+.eq-advanced-presets {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 16px;
+}
+
+.eq-preset-chip {
+  flex-shrink: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.eq-preset-chip:hover {
+  border-color: var(--hibiscus);
+}
+
+.eq-save-btn {
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Reserve space at the bottom of scrollable layouts so the fixed player
+   bar never overlaps the last row of content. */
+.app-shell {
+  padding-bottom: 76px;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ==========================================================================
+   Albums, tracks, ingestion holding pen
+   ========================================================================== */
+
+.album-form-inline {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr auto auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.album-form-inline [data-error] {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .album-form-inline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.album-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+
+.album-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ingestion-pen input[type="file"] {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.holding-pen-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pen-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pen-row .pen-title-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.pen-row .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.choice-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ==========================================================================
+   Search, artist links, favorites, artist profile
+   ========================================================================== */
+
+.btn-icon-only {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.btn-icon-only:hover {
+  border-color: var(--hibiscus);
+}
+
+.artist-link {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.artist-link:hover {
+  color: var(--hibiscus);
+}
+
+.track-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btn-heart {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-heart svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-heart.is-favorited {
+  color: var(--hibiscus);
+}
+
+.btn-following {
+  border-color: var(--sunset) !important;
+  color: var(--sunset) !important;
+}
+
+/* ---------- Search ---------- */
+
+.search-layout {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 18px;
+  color: var(--text-muted);
+}
+
+.search-input-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: var(--font-body);
+}
+
+/* ---------- Artist profile ---------- */
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 28px;
+}
+
+@media (max-width: 900px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-header {
+  grid-column: 1 / -1;
+}
+
+.profile-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.profile-header-row h1 {
+  font-size: 28px;
+  margin: 4px 0 8px;
+}
+
+.genre-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.genre-tag {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Sidebar app frame (replaces the old per-view topbar shell)
+   ========================================================================== */
+
+.app-frame {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 14px;
+}
+
+.sidebar-brand {
+  padding: 0 8px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-nav-item svg {
+  flex-shrink: 0;
+}
+
+.sidebar-nav-item:hover,
+.sidebar-nav-item.active {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+}
+
+.sidebar-library {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.sidebar-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-playlists {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-playlist-item {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-playlist-item:hover {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-content {
+  flex: 1;
+  padding: 28px;
+  padding-bottom: 100px; /* room for the fixed player bar */
+}
+
+.panel-status-row {
+  margin-bottom: 16px;
+}
+
+/* ---------- Artist profile avatar ---------- */
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.profile-avatar-placeholder {
+  background: var(--gradient-action);
+}
+
+.profile-header-row {
+  align-items: flex-start;
+}
+
+.profile-header-text {
+  flex: 1;
+}
+
+.profile-follow-btn {
+  margin-top: 14px;
+  max-width: 160px;
+}
+
+/* ==========================================================================
+   Hero greeting banner + image-forward cards
+   ========================================================================== */
+
+.hero-banner {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  margin-bottom: 20px;
+  background: linear-gradient(115deg, var(--hero-purple) 0%, #3a2a6b 45%, var(--hero-pink) 100%);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.hero-banner .eyebrow {
+  margin-bottom: 4px;
+}
+
+.hero-banner h1 {
+  font-size: 34px;
+  margin: 0;
+}
+
+.card-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.track-card {
+  flex-shrink: 0;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-card-art {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: var(--radius-md);
+  background-size: cover;
+  background-position: center;
+}
+
+.track-card-art-placeholder {
+  background: var(--gradient-action);
+}
+
+.track-card-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 38px;
+  height: 38px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.track-card:hover .track-card-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.track-card-title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Glassmorphism pass — cards, sidebar, topbar all get translucent + blur,
+   matching the treatment the player bar already had.
+   ========================================================================== */
+
+.sidebar,
+.app-topbar {
+  background: rgba(24, 24, 24, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dash-col {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.track-card {
+  background: transparent;
+}
+
+.list-item {
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 0.12s ease;
+}
+
+.list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-playlist-item:hover,
+.sidebar-nav-item:hover,
+.sidebar-nav-item.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.track-card {
+  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.track-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Animated ambient background — slow, subtle, stays behind everything so it
+   never fights with card contrast. Full-page fixed layer, content sits above it.
+   ========================================================================== */
+
+body {
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(120deg, #0d0d0d, #1a1025, #0d0d0d, #0d1f16, #0d0d0d);
+  background-size: 400% 400%;
+  animation: ambientGradient 26s ease infinite;
+}
+
+@keyframes ambientGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.app-frame,
+.screen {
+  background: transparent;
+}
+
+/* ==========================================================================
+   Below: original, now-superseded rules kept intentionally harmless
+   ========================================================================== */
+
+/* ==========================================================================
+   Top search bar
+   ========================================================================== */
+
+.topbar-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 320px;
+  text-align: left;
+}
+
+.topbar-search-btn:hover {
+  border-color: var(--hibiscus);
+  color: var(--text-primary);
+}
+
+.app-topbar {
+  justify-content: space-between !important;
+}
+
+/* ==========================================================================
+   Section headers with scroll arrows
+   ========================================================================== */
+
+.section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.section-controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.scroll-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scroll-arrow:hover {
+  border-color: var(--hibiscus);
+}
+
+/* ==========================================================================
+   Sidebar playlist thumbnails
+   ========================================================================== */
+
+.sidebar-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-playlist-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.sidebar-playlist-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.sidebar-playlist-text strong {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Hero recently-played corner widget
+   ========================================================================== */
+
+.hero-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.hero-recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.hero-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(11, 17, 30, 0.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.hero-recent-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hero-recent-text strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Bigger, more premium card sizing
+   ========================================================================== */
+
+.track-card {
+  width: 190px;
+}
+
+.track-card-art {
+  width: 190px;
+  height: 190px;
+}

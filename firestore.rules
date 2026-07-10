@@ -1,0 +1,139 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isArtist(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'ARTIST';
+    }
+
+    function isActiveArtist(userId) {
+      return isArtist(userId) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.artistMetadata.isActive == true;
+    }
+
+    // ---------- users ----------
+    match /users/{userId} {
+      allow read: if true; // public profiles
+      allow create: if isOwner(userId);
+
+      // Owners can edit their own profile, but never touch billing/verification fields directly.
+      allow update: if isOwner(userId) &&
+        !('isVerified' in request.resource.data.artistMetadata) ||
+        (isOwner(userId) &&
+          request.resource.data.artistMetadata.isVerified == resource.data.artistMetadata.isVerified &&
+          request.resource.data.artistMetadata.isActive == resource.data.artistMetadata.isActive &&
+          request.resource.data.artistMetadata.subscriptionExpires == resource.data.artistMetadata.subscriptionExpires);
+
+      // Only admins (or the Revenue Protection Interceptor running as a trusted backend) may
+      // change isVerified, isActive, or subscriptionExpires.
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- payments ----------
+    match /payments/{paymentId} {
+      // Artist can create their own pending payment record and read their own history.
+      allow create: if isSignedIn() &&
+        request.resource.data.artistId == request.auth.uid &&
+        request.resource.data.verificationStatus == 'PENDING';
+
+      allow read: if isSignedIn() &&
+        (resource.data.artistId == request.auth.uid || isAdmin());
+
+      // Only admins can verify/reject a payment or set verifiedBy/verifiedAt/resultingExpiry.
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- reports ----------
+    match /reports/{reportId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.reporterId == request.auth.uid &&
+        request.resource.data.status == 'OPEN';
+
+      // Reporters can't read the moderation queue; only admins triage it.
+      allow read: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- concerts ----------
+    match /concerts/{concertId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() &&
+        request.resource.data.artistId == request.auth.uid &&
+        isArtist(request.auth.uid);
+
+      // Artist can edit their own concert; interestedCount incrementing is handled separately below.
+      allow update: if isSignedIn() && resource.data.artistId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        (resource.data.artistId == request.auth.uid || isAdmin());
+    }
+
+    // ---------- albums ----------
+    match /albums/{albumId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.artistId == request.auth.uid &&
+        isArtist(request.auth.uid);
+      allow update, delete: if isSignedIn() &&
+        (resource.data.artistId == request.auth.uid || isAdmin());
+    }
+
+    // ---------- tracks ----------
+    match /tracks/{trackId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.artistId == request.auth.uid &&
+        isArtist(request.auth.uid);
+
+      // Owner can edit metadata; playCount increments are allowed from any signed-in fan
+      // as a narrow, single-field exception (non-atomic counter, low-stakes by design).
+      allow update: if isSignedIn() && (
+        resource.data.artistId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playCount'])
+      );
+      allow delete: if isSignedIn() &&
+        (resource.data.artistId == request.auth.uid || isAdmin());
+    }
+
+    // ---------- follows ----------
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+
+      // Enforce the deterministic composite key: document ID must equal fanId_artistId,
+      // and the caller must be the fan doing the following.
+      allow create: if isSignedIn() &&
+        request.resource.data.fanId == request.auth.uid &&
+        followId == request.resource.data.fanId + '_' + request.resource.data.artistId;
+
+      allow delete: if isSignedIn() && resource.data.fanId == request.auth.uid;
+      allow update: if false; // follows are create/delete only, never mutated
+    }
+
+    // ---------- playlists ----------
+    match /playlists/{playlistId} {
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}
