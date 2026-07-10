@@ -1390,13 +1390,30 @@ h2 {
 
 .sidebar,
 .app-topbar,
-.dash-col,
-.track-card,
-.hero-banner,
+.hero-banner {
+  background: rgba(19, 27, 46, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dash-col {
+  background: rgba(19, 27, 46, 0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.track-card {
+  background: transparent;
+}
+
 .list-item {
-  background: rgba(19, 27, 46, 0.6);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 0.12s ease;
+}
+
+.list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-playlist-item:hover,
@@ -1408,7 +1425,7 @@ h2 {
 .track-card {
   border-radius: var(--radius-md);
   padding: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   transition: background 0.15s ease, transform 0.15s ease;
 }
 
@@ -1416,6 +1433,40 @@ h2 {
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-2px);
 }
+
+/* ==========================================================================
+   Animated ambient background — slow, subtle, stays behind everything so it
+   never fights with card contrast. Full-page fixed layer, content sits above it.
+   ========================================================================== */
+
+body {
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(120deg, #0b111e, #17182f, #0b111e, #201021, #0b111e);
+  background-size: 400% 400%;
+  animation: ambientGradient 26s ease infinite;
+}
+
+@keyframes ambientGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.app-frame,
+.screen {
+  background: transparent;
+}
+
+/* ==========================================================================
+   Below: original, now-superseded rules kept intentionally harmless
+   ========================================================================== */
 
 /* ==========================================================================
    Top search bar
