@@ -5,42 +5,41 @@
    banner only.
    ========================================================================== */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap");
 
 :root {
-  /* Canvas — near-black, matching the reference exactly */
-  --bg: #0d0d0d;
-  --surface: #181818;
-  --surface-raised: #242424;
-  --border: rgba(255, 255, 255, 0.08);
+  /* Canvas — deep navy, with a vivid animated gradient living behind every
+     glass panel so there's real color to see through the blur */
+  --bg: #0a0e1a;
+  --surface: #131b2e;
+  --surface-raised: #1b2540;
+  --border: rgba(255, 255, 255, 0.12);
 
   /* Type */
-  --text-primary: #ffffff;
-  --text-muted: #a7a7a7;
+  --text-primary: #f5f3ee;
+  --text-muted: #a3adc2;
 
-  /* Primary action color — solid green, used for play states, active nav,
-     Follow, progress fills. This replaces the old pink/orange system. */
-  --accent-green: #1ed760;
-  --accent-green-dim: #1db954;
+  /* AMP's own brand accents — action tones for playback state, active nav, follow, EQ */
+  --hibiscus: #ff4d8d;
+  --sunset: #ff7a45;
+  --gradient-action: linear-gradient(135deg, var(--sunset), var(--hibiscus));
 
-  /* Reserved strictly for the hero banner's purple-to-pink gradient wash —
-     not used anywhere else in the UI, matching the reference's treatment. */
-  --hero-purple: #5b2a86;
-  --hero-pink: #b6396b;
-
-  /* Legacy names kept so existing component rules don't all need renaming —
-     both now resolve to the green accent instead of pink/orange. */
-  --hibiscus: #1ed760;
-  --sunset: #1db954;
-  --gradient-action: var(--accent-green);
+  /* Liquid glass surface — translucent fill + specular top edge, tuned so
+     the animated background shows through with real saturation, not just grey blur */
+  --glass-fill: rgba(255, 255, 255, 0.06);
+  --glass-fill-strong: rgba(255, 255, 255, 0.1);
+  --glass-blur: blur(22px) saturate(180%);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 
   /* Type scale */
-  --font-display: "Inter", sans-serif;
+  --font-display: "Fraunces", serif;
   --font-body: "Inter", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
 
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
 }
 
 * {
@@ -90,7 +89,7 @@ a {
   width: 620px;
   height: 620px;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(30, 215, 96, 0.22) 0%, rgba(91, 42, 134, 0.16) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 122, 69, 0.28) 0%, rgba(255, 77, 141, 0.14) 45%, transparent 70%);
   filter: blur(10px);
   pointer-events: none;
 }
@@ -99,10 +98,13 @@ a {
   position: relative;
   width: 100%;
   max-width: 400px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--glass-fill-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 36px 28px;
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 /* ==========================================================================
@@ -135,8 +137,8 @@ a {
 h1,
 h2 {
   font-family: var(--font-display);
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0 0 4px;
 }
 
@@ -517,11 +519,11 @@ h2 {
   align-items: center;
   gap: 28px;
   padding: 14px 28px;
-  background: rgba(24, 24, 24, 0.85);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+  background: var(--glass-fill-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 -8px 30px rgba(0, 0, 0, 0.35);
 }
 
 .player-bar[hidden],
@@ -582,7 +584,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(30, 215, 96, 0.35);
+  box-shadow: 0 4px 16px rgba(255, 77, 141, 0.35);
   transition: transform 0.12s ease;
 }
 
@@ -691,10 +693,10 @@ h2 {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  background: rgba(27, 37, 64, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
+  background: var(--glass-fill-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 20px 24px;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.4);
@@ -772,7 +774,7 @@ h2 {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: linear-gradient(180deg, #181818 0%, #0d0d0d 100%);
+  background: linear-gradient(180deg, #1b2540 0%, #0a0e1a 100%);
   display: flex;
   flex-direction: column;
   padding: 24px 32px 32px;
@@ -1330,8 +1332,11 @@ h2 {
   border-radius: var(--radius-lg);
   padding: 32px 28px;
   margin-bottom: 20px;
-  background: linear-gradient(115deg, var(--hero-purple) 0%, #3a2a6b 45%, var(--hero-pink) 100%);
-  border: 1px solid var(--border);
+  background: linear-gradient(115deg, rgba(255, 122, 69, 0.35) 0%, rgba(255, 77, 141, 0.3) 100%), var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   overflow: hidden;
 }
 
@@ -1397,58 +1402,74 @@ h2 {
 }
 
 /* ==========================================================================
-   Glassmorphism pass — cards, sidebar, topbar all get translucent + blur,
-   matching the treatment the player bar already had.
+   Liquid glass pass — every surface (sidebar, topbar, cards, list rows) is
+   translucent with a saturation-boosted blur, so the vivid animated
+   background actually reads as color through the glass, plus a subtle
+   specular highlight along the top edge for that lifted, glassy depth.
    ========================================================================== */
 
 .sidebar,
 .app-topbar {
-  background: rgba(24, 24, 24, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight);
 }
 
 .dash-col {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .track-card {
-  background: transparent;
+  background: var(--glass-fill);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.track-card:hover {
+  background: var(--glass-fill-strong);
+  transform: translateY(-3px);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .list-item {
-  background: transparent;
-  border: 1px solid transparent;
-  transition: background 0.12s ease;
+  background: var(--glass-fill);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  transition: background 0.15s ease;
 }
 
 .list-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-fill-strong);
 }
 
 .sidebar-playlist-item:hover,
 .sidebar-nav-item:hover,
 .sidebar-nav-item.active {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.track-card {
+  background: var(--glass-fill-strong);
   border-radius: var(--radius-md);
-  padding: 12px;
-  border: 1px solid transparent;
-  transition: background 0.15s ease, transform 0.15s ease;
 }
 
-.track-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateY(-2px);
+.hero-recent-row {
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--glass-border);
 }
 
 /* ==========================================================================
-   Animated ambient background — slow, subtle, stays behind everything so it
-   never fights with card contrast. Full-page fixed layer, content sits above it.
+   Animated ambient background — vivid enough to actually see through the
+   glass panels above. Full-page fixed layer, content sits above it.
    ========================================================================== */
 
 body {
@@ -1460,9 +1481,9 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(120deg, #0d0d0d, #1a1025, #0d0d0d, #0d1f16, #0d0d0d);
+  background: linear-gradient(120deg, #0a0e1a, #3a1a4a, #0a0e1a, #4a1f2e, #7a2e1a, #0a0e1a);
   background-size: 400% 400%;
-  animation: ambientGradient 26s ease infinite;
+  animation: ambientGradient 22s ease infinite;
 }
 
 @keyframes ambientGradient {
