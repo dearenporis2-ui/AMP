@@ -47,12 +47,12 @@ function hashSeed(str) {
 }
 
 const ART_PALETTES = [
-  ["#0F9B8E", "#0D0D0D", 135],
-  ["#5B2A86", "#B6396B", 120],
-  ["#1ED760", "#0D0D0D", 140],
-  ["#2A3A8E", "#5B2A86", 100],
-  ["#C97B2E", "#0D0D0D", 160],
-  ["#B6396B", "#3A2A6B", 80]
+  ["#FF7A45", "#FF4D8D", 135],
+  ["#FF4D8D", "#FF7A45", 45],
+  ["#1B2540", "#FF4D8D", 120],
+  ["#FF7A45", "#1B2540", 200],
+  ["#0A0E1A", "#FF7A45", 160],
+  ["#FF4D8D", "#0A0E1A", 70]
 ];
 
 function generatedArtSvg(seed) {
